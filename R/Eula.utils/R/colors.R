@@ -16,7 +16,7 @@ checkColorMap.default <- function(x, colors = NULL, ...) {
       "'colors' is NULL. Calling 'setColors' for the following levels: \n  ",
       paste(all_levels, collapse = ", ")
     )
-    return(SetColor(x, ...))
+    return(setColors(x, ...))
   }
   if (length(names(colors)) == 0) {
     color_names <- all_levels[1:min(length(all_levels), length(colors))]
@@ -32,17 +32,17 @@ checkColorMap.default <- function(x, colors = NULL, ...) {
       "Calling 'setColors' since the following levels mapped to no color: \n  ",
       paste(miss_levels, collapse = ", ")
     )
-    colors0 <- SetColor(x, ...)
+    colors0 <- setColors(x, ...)
     colors0[names(colors)] <- colors
     return(colors0)
   }
   if (!all(all_levels %in% names(colors))) {
     miss_levels <- setdiff(all_levels, names(colors))
     fastWarning(
-      "Calling 'SetColor' since the following levels mapped to no color: \n  ",
+      "Calling 'setColors' since the following levels mapped to no color: \n  ",
       paste(miss_levels, collapse = ", ")
     )
-    colors0 <- SetColor(x, ...)
+    colors0 <- setColors(x, ...)
     cmm.nm <- intersect(names(colors0), names(colors))
     colors0[cmm.nm] <- colors[cmm.nm]
     return(colors0)
