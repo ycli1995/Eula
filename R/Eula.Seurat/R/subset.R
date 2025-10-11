@@ -1,3 +1,5 @@
+#' @importFrom SeuratObject Assays Cells Graphs Images
+NULL
 
 get_cells_and_features <- function(
     object,
@@ -157,6 +159,7 @@ SubsetObject <- function(
   "features_exclude"
 )
 
+#' @importFrom Eula.utils readTable
 read_subset_files <- function(parameter, ...) {
   for (i in .SUBSET_FILES) {
     if (!is.null(parameter[[i]])) {
