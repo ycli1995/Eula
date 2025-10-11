@@ -79,6 +79,7 @@ checkColorMap.Seurat <- function(
   x
 }
 
+#' @importFrom SeuratObject Idents<- Idents
 #' @export
 RenameSeurat <- function(
     object,
