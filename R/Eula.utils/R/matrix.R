@@ -15,3 +15,4 @@ asMatrix <- function(object, max.row = 1000) {
 min_max <- function(x) {
   (x - min(x)) / (max(x) - min(x))
 }
+
