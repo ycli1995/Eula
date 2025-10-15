@@ -62,5 +62,5 @@ filterData.data.frame <- function(
     return(rep.int(TRUE, nrow(x)))
   }
   message("Filtering data by column '", column, "'.")
-  filterData(x = x[[column]], include = include, include = include)
+  filterData(x = x[[column]], include = include, exclude = exclude)
 }
