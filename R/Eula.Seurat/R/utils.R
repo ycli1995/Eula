@@ -99,9 +99,13 @@ ShrinkSeuratObject <- function(
   if (!scale.data) {
     message("remove 'scale.data' ")
     if (packageVersion("Seurat") >= 5) {
-      LayerData(object, layer = "scale.data") <- NULL
+      SeuratObject::LayerData(object, layer = "scale.data") <- NULL
     } else {
-      object <- SetAssayData(object, slot = "scale.data", new.data = matrix(0, 0, 0))
+      object <- SeuratObject::SetAssayData(
+        object,
+        slot = "scale.data",
+        new.data = matrix(0, 0, 0)
+      )
     }
     gc(verbose = FALSE)
   }
