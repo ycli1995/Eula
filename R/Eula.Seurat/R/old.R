@@ -1,7 +1,7 @@
 
 #' @export
-CheckMySeuratObj <- function(object) {
-  object <- CheckSeuratMetaData(object)
+CheckMySeuratObj <- function(object, ...) {
+  object <- CheckSeuratMetaData(object, ...)
   object <- CheckSeuratFData(object)
   object
 }

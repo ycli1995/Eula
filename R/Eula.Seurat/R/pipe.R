@@ -21,7 +21,7 @@ pipe_RenameObject <- function(obj, parameter = list()) {
   obj <- UpdateSeuratAll(obj, assay5 = parameter$Assay5)
 
   Message('>>>>> Check default columns...')
-  obj <- CheckSeuratMetaData(obj, parameter$default_colnames)
+  obj <- CheckMySeuratObj(obj, parameter$default_colnames)
 
   Message('>>>>> Subset Seurat object...')
   obj <- SubsetObjectWrapper(obj, parameter$subset)
