@@ -107,11 +107,11 @@ RenameSeurat <- function(
 }
 
 #' @export
-RenameSeuratColumns <- function(object, parameter = list()) {
-  for (i in names(parameter)) {
-    if (parameter[[i]] %in% colnames(object@meta.data)) {
-      message("Rename '", parameter[[i]], "' to '", i, "'")
-      object@meta.data[, i] <- object@meta.data[, parameter[[i]]]
+RenameSeuratColumns <- function(object, map = list()) {
+  for (i in names(map)) {
+    if (map[[i]] %in% colnames(object@meta.data)) {
+      message("Rename '", map[[i]], "' to '", i, "'")
+      object@meta.data[, i] <- object@meta.data[, map[[i]]]
     }
   }
   return(object)
@@ -125,7 +125,6 @@ RenameSeuratColumns <- function(object, parameter = list()) {
   "Cluster" = "color.cluster",
   "Clusters" = "color.cluster"
 )
-
 
 #' @export
 RenameSeuratMetaData <- function(object, parameter = list()) {
@@ -185,3 +184,30 @@ RenameSeuratWrapper <- function(object, parameter = list()) {
   }
   object
 }
+
+#' @export
+WriteRenameConf <- function(
+    object,
+    outdir = getwd(),
+    columns = c("Samples", "Groups", "Clusters")
+) {
+  columns <- intersect(columns, colnames(obj[[]]))
+  for (i in columns) {
+    labels <- levels(as.factor(obj[[]][, i]))
+    write(labels, file.path(outdir, paste0(i, ".list")))
+
+    rename.df <- data.frame(V1 = labels, V2 = labels)
+    colors <- obj@misc$colors[[i]]
+    if (length(colors) > 0) {
+      rename.df$V3 <- colors[labels]
+    }
+    writeTable(
+      rename.df,
+      file.path(outdir, paste0(i, "_conf.xls")),
+      col.names = FALSE
+    )
+  }
+  invisible(NULL)
+}
+
+

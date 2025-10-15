@@ -35,7 +35,7 @@ UpdateAssay5 <- function(object) {
 UpdateSeurat5 <- function(object) {
   object <- UpdateAssay5(object)
   object <- UpdateReductions5(object)
-  return(object)
+  object
 }
 
 #' @importFrom SeuratObject Images UpdateSeuratObject Version
@@ -71,6 +71,19 @@ UpdateSeurat3 <- function(object) {
 
   if (length(old.images) > 0) {
     object@images <- object@images[old.images]
+  }
+  object
+}
+
+#' @export
+UpdateSeuratAll <- function(object, assay5 = FALSE) {
+  object <- UpdateSeurat3(object)
+  if (packageVersion("Seurat") < 5) {
+    return(object)
+  }
+  object <- UpdateReductions5(object)
+  if (assay5) {
+    object <- UpdateAssay5(object)
   }
   object
 }
