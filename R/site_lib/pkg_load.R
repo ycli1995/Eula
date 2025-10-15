@@ -9,9 +9,10 @@ load_pkg <- function(name, pkg_conf) {
     stop("Package '", name, "' is not found.")
   }
   for (i in pkg_conf[[name]]$import) {
-    if (!paste0("package:", i) %in% search()) {
-      load_pkg(i, pkg_conf = pkg_conf)
+    if (paste0("package:", i) %in% search()) {
+      pkgload::unload(i)
     }
+    load_pkg(i, pkg_conf = pkg_conf)
   }
   pkgload::load_all(name)
   invisible(NULL)
