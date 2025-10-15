@@ -28,27 +28,27 @@ get_cells_and_features <- function(
   }
   list(cells = all_cells, features = all_features)
 }
-
-get_subset_cells <- function(object, column, include = NULL, exclude = NULL) {
-  cells <- rownames(object[[]])
-  if (!column %in% colnames(object@meta.data)) {
-    fastWarning("Subset: '", column, "' not found in object@meta.data")
-    return(cells)
-  }
-  if (length(include) > 0) {
-    include <- as.character(include)
-    message("Search '", column, "' includes: ", paste(include, collapse = ", "))
-    use_cells <- rownames(object[[]])[object@meta.data[, column] %in% include]
-    cells <- intersect(cells, use_cells)
-  }
-  if (length(exclude) > 0) {
-    exclude <- as.character(exclude)
-    message("Search '", column, "' excludes: ", paste(exclude, collapse = ", "))
-    use_cells <- rownames(object[[]])[!object@meta.data[, column] %in% exclude]
-    cells <- intersect(cells, use_cells)
-  }
-  return(cells)
-}
+#
+# get_subset_cells <- function(object, column, include = NULL, exclude = NULL) {
+#   cells <- rownames(object[[]])
+#   if (!column %in% colnames(object@meta.data)) {
+#     fastWarning("Subset: '", column, "' not found in object@meta.data")
+#     return(cells)
+#   }
+#   if (length(include) > 0) {
+#     include <- as.character(include)
+#     message("Search '", column, "' includes: ", paste(include, collapse = ", "))
+#     use_cells <- rownames(object[[]])[object@meta.data[, column] %in% include]
+#     cells <- intersect(cells, use_cells)
+#   }
+#   if (length(exclude) > 0) {
+#     exclude <- as.character(exclude)
+#     message("Search '", column, "' excludes: ", paste(exclude, collapse = ", "))
+#     use_cells <- rownames(object[[]])[!object@meta.data[, column] %in% exclude]
+#     cells <- intersect(cells, use_cells)
+#   }
+#   return(cells)
+# }
 
 check_image_cells <- function(object) {
   if (!"images" %in% slotNames(object)) {
@@ -65,6 +65,7 @@ check_image_cells <- function(object) {
   return(object)
 }
 
+#' @importFrom Eula.utils filterData
 #' @export
 SubsetObject <- function(
     object,
@@ -76,11 +77,13 @@ SubsetObject <- function(
   cells_kp <- rownames(object[[]])
   for (i in names(column_map)) {
     if (!is.null(column_map[[i]])) {
-      use_cells <- get_subset_cells(
-        object = object,
+      filter.out <- filterData(
+        x = object[[]],
         column = i,
-        include = column_map[[i]][['include']]
+        include = column_map[[i]][['include']],
+        exclude = column_map[[i]][['exclude']]
       )
+      use_cells <- rownames(object[[]])[filter.out]
       cells_kp <- intersect(cells_kp, use_cells)
     }
   }

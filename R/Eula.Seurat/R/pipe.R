@@ -41,3 +41,15 @@ pipe_RenameObject <- function(obj, parameter = list()) {
 
   obj
 }
+
+pipe_MakeSeuratObj <- function(parameter) {
+  param1 <- parameter[["MakeSeuratObj"]]
+  if (length(param1) == 0) {
+    stop("'MakeSeuratObj' parameter is empty.")
+  }
+
+
+
+
+}
+
