@@ -9,6 +9,12 @@ get_cells_and_features <- function(
     features_exclude = NULL
 ) {
   all_cells <- rownames(object[[]])
+
+  cells <- norm_list_param(cells)
+  features <- norm_list_param(features)
+  cells_exclude <- norm_list_param(cells_exclude)
+  features_exclude <- norm_list_param(features_exclude)
+
   if (length(cells) > 0) {
     all_cells <- intersect(all_cells, cells)
   }

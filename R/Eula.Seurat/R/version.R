@@ -2,7 +2,7 @@
 #' @importFrom SeuratObject Images UpdateSeuratObject Version
 #' @export
 UpdateReductions5 <- function(object) {
-  if (Version(object) >= 5) {
+  if (Version(object) >= package_version("5.0.0")) {
     return(object)
   }
   old.reds <- object@reductions
@@ -76,13 +76,14 @@ UpdateSeurat3 <- function(object) {
 }
 
 #' @export
-UpdateSeuratAll <- function(object, assay5 = FALSE) {
+UpdateSeuratAll <- function(object, Assay5 = NULL) {
   object <- UpdateSeurat3(object)
-  if (packageVersion("Seurat") < 5) {
+  if (packageVersion("Seurat") < package_version("5.0.0")) {
     return(object)
   }
   object <- UpdateReductions5(object)
-  if (assay5) {
+  Assay5 <- Assay5 %||% FALSE
+  if (Assay5) {
     object <- UpdateAssay5(object)
   }
   object

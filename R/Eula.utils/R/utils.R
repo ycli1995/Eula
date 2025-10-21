@@ -359,11 +359,11 @@ norm_list_param <- function(x, ...) {
   if (length(x) > 1) {
     return(x)
   }
-  if (is.logical(x)) {
+  if (!is.character(x)) {
     return(x)
   }
   if (file.exists(x)) {
-    x <- readTable(x, ...)[, 1]
+    x <- readTable(x, header = FALSE, ...)[, 1]
     return(x)
   }
   if (grepl("\\S,\\S", x)) {

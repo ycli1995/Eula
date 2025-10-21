@@ -129,3 +129,21 @@ statCrossTab.data.frame <- function(
   }
   return(stat)
 }
+
+#' @export featureSetPct
+featureSetPct <- function(object, ...) {
+  UseMethod("featureSetPct", object)
+}
+
+#' @export
+#' @method featureSetPct default
+featureSetPct.default <- function(object, features, ...) {
+  features <- intersect(features, rownames(object))
+  if (length(features) == 0) {
+    fastWarning("No feature found.")
+    return(rep.int(0, ncol(object)))
+  }
+  csum0 <- Matrix::colSums(object)
+  csum <- Matrix::colSums(object[features, , drop = FALSE])
+  csum / csum0
+}

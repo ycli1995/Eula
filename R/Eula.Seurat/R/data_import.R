@@ -165,13 +165,13 @@ MakeSeuratObj <- function(
 
   # Add fdata
   all.features <- all.features[rownames(mats)]
-  fdata <- ReadNameList(all.features, name_list = name_list)
+  fdata <- ReadNameList(all.features, name.list = name.list)
   fdata <- fdata[rownames(mats), ]
 
   # Change to gene symbols
   rownames(mats) <- rownames(fdata) <- make.unique(fdata$name)
   rownames(mats) <- rownames(fdata) <- gsub("_", "-", rownames(fdata))
-  fdata$seurat_id <- rownames(fdata)
+  fdata$unique_name <- rownames(fdata)
 
   object <- CreateSeuratObject(
     mats,
@@ -180,6 +180,8 @@ MakeSeuratObj <- function(
     min.features = -1
   )
   object$orig.ident <- pdata[Cells(object), "orig.ident"]
+
+  object@misc$rowData <- fdata
   object
 }
 
@@ -216,10 +218,39 @@ MergeObject <- function(object.list, ...) {
     return(object.list[[1]])
   }
   object <- merge(object.list[[1]], object.list[-1], ...)
-  if (Version(object) < 5) {
+  if (Version(object) < package_version("5.0.0")) {
     return(object)
   }
   object <- SeuratObject::JoinLayers(object)
   object
 }
+
+#' @importFrom SeuratObject AddMetaData
+#' @export
+StatFeatures <- function(
+    object,
+    features,
+    col.name = NULL,
+    stat.pct = FALSE,
+    assay = NULL
+) {
+  assay <- assay %||% DefaultAssay(object)
+  features <- norm_list_param(features)
+  features <- getFeaturesID(object, features = features)
+  features <- intersect(features, rownames(object[[assay]]))
+  out <- Matrix::colSums(
+    GetAssayData(object[[assay]], "counts")[features, , drop = FALSE]
+  )
+  if (stat.pct) {
+    out <- out / object[[paste0("nCount_", assay)]] * 100
+  }
+  out[is.na(out)] <- 0
+  if (is.null(col.name)) {
+    return(out)
+  }
+  object@misc$StatFeatures[[col.name]] <- features
+  object <- AddMetaData(object, metadata = out, col.name = col.name)
+  object
+}
+
 

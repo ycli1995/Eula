@@ -41,9 +41,9 @@ filterData.numeric <- function(x, include = NULL, exclude = NULL, ...) {
   exclude <- as.list(exclude)
 
   include <- include[lengths(include) == 2]
-  include <- include[vapply(include, is.numeric, FUN.VALUE = logical(1))]
+  include <- lapply(include, as.numeric)
   exclude <- exclude[lengths(exclude) == 2]
-  exclude <- exclude[vapply(exclude, is.numeric, FUN.VALUE = logical(1))]
+  exclude <- lapply(exclude, as.numeric)
 
   if (length(include) > 0) {
     include <- Reduce("|", lapply(include, function(r) x >= r[1] & x <= r[2]))

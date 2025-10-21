@@ -15,21 +15,25 @@ getFeaturesID.data.frame <- function(object, features, uniq = FALSE, ...) {
 
   features <- sapply(features, function(x) {
     x <- toupper(x)
-    g1 <- object$id %in% x
+    g1 <- toupper(object$id) %in% x
     if (any(g1)) {
       return(rownames(object)[g1])
     }
-    g2 <- object$name %in% x
+    g2 <- toupper(object$name) %in% x
     if (any(g2)) {
       return(rownames(object)[g2])
     }
-    g3 <- object$unique_name %in% x
+    g3 <- toupper(object$unique_name) %in% x
     if (any(g3)) {
       return(rownames(object)[g3])
     }
-    g4 <- object$merge_name %in% x
+    g4 <- toupper(object$merge_name) %in% x
     if (any(g4)) {
       return(rownames(object)[g4])
+    }
+    g5 <- toupper(rownames(object)) %in% x
+    if (any(g5)) {
+      return(rownames(object)[g5])
     }
     message("[WARNING] '", x, "' not found gene id.")
     return(NULL)

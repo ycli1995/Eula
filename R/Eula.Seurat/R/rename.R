@@ -108,9 +108,10 @@ RenameSeurat <- function(
 
 #' @export
 RenameSeuratColumns <- function(object, map = list()) {
+  Message('>>>>> Rename columns in obj@meta.data...')
   for (i in names(map)) {
     if (map[[i]] %in% colnames(object@meta.data)) {
-      message("Rename '", map[[i]], "' to '", i, "'")
+      message("Reset object@meta.data: '", map[[i]], "' -> '", i, "'")
       object@meta.data[, i] <- object@meta.data[, map[[i]]]
     }
   }
@@ -174,6 +175,7 @@ RenameSeuratMetaData <- function(object, parameter = list()) {
 
 #' @export
 RenameSeuratWrapper <- function(object, parameter = list()) {
+  Message('>>>>> Rename Seurat...')
   print(str(object[[]]))
   print(str(object@misc))
   for (i in names(parameter)) {

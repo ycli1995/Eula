@@ -59,6 +59,13 @@ checkColorMap.data.frame <- function(x, column, colors = NULL, ...) {
   checkColorMap(x[, column], colors = colors, ...)
 }
 
+#' @importFrom circlize colorRamp2
+#' @export
+colorRampN <- function(breaks, colors, ...) {
+  breaks2 <- approx(x = breaks, y = breaks, n = length(colors))
+  colorRamp2(breaks = breaks2, colors = colors, ...)
+}
+
 #' @export
 setColors <- function(x, type = "tsne", tag = "set1", ...) {
   if (!is.factor(x)) {

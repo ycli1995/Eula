@@ -84,7 +84,7 @@ ShrinkSeuratObject <- function(
     misc.counts = NULL,
     ...
 ) {
-  assays <- assays %||% DefaultAssay(object)
+  assays <- assays %||% SeuratObject::Assays(object)
   scale.data <- scale.data %||% FALSE
   misc.counts <- misc.counts %||% TRUE
 
@@ -115,4 +115,41 @@ ShrinkSeuratObject <- function(
     object@misc$counts <- NULL
   }
   object
+}
+
+#' @export
+#' @method getFeaturesID Seurat
+getFeaturesID.Seurat <- function(object, features, uniq = FALSE, ...) {
+  object <- CheckSeuratFData(object)
+  rowData <- object@misc$rowData
+  if (!is.data.frame(rowData)) {
+    fastWarning("No 'rowData' in this Seurat object. Cannot get row names")
+    return(features)
+  }
+  getFeaturesID(object = rowData, features = features, uniq = uniq, ...)
+}
+
+#' @importFrom Eula.utils getFeaturesName
+#' @export
+#' @method getFeaturesName Seurat
+getFeaturesName.Seurat <- function(
+    object,
+    features,
+    col = "unique_name",
+    uniq = FALSE,
+    ...
+) {
+  object <- CheckSeuratFData(object)
+  rowData <- object@misc$rowData
+  if (!is.data.frame(rowData)) {
+    fastWarning("No 'rowData' in this Seurat object. Cannot get feature names")
+    return(features)
+  }
+  getFeaturesID(
+    object = rowData,
+    features = features,
+    col = col,
+    uniq = uniq,
+    ...
+  )
 }

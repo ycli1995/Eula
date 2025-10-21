@@ -1,6 +1,7 @@
 
 #' @export
 CheckMySeuratObj <- function(object, ...) {
+  Message('>>>>> Check Seurat extra information...')
   object <- CheckSeuratMetaData(object, ...)
   object <- CheckSeuratFData(object)
   object
