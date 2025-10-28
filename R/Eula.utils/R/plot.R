@@ -116,6 +116,7 @@ single_dim_plot <- function(
     facet.args = list(),
     labs.args = list(),
     theme = NULL,
+    guides = NULL,
     ...
 ) {
   if (nrow(data) > 1e+5 & is.null(raster)) {
@@ -154,12 +155,15 @@ single_dim_plot <- function(
     p <- p + geom_point(mapping = mapping, size = pt.size, ...)
   }
   if ("colour" %in% colnames(data) & !is.null(colors)) {
-    scale.color <- if (is.numeric(data$colour)) {
-      scale_color_gradientn(colors = colors, limits = color.limits)
+    if (is.numeric(data$colour)) {
+      p <- p + scale_color_gradientn(colors = colors, limits = color.limits)
     } else {
-      scale_color_manual(values = colors)
+      if (length(colors) < length(unique(data$colour))) {
+        fastWarning("Insufficient values in manual colors. Use default colors")
+      } else {
+        p <- p + scale_color_manual(values = colors)
+      }
     }
-    p <- p + scale.color
   }
   if (!is.null(label.data)) {
     p <- p + add_labels(
@@ -170,6 +174,7 @@ single_dim_plot <- function(
       color = label.color
     )
   }
+  p <- p + dim_plot_guides()
   p <- .add_my_facet_split(p = p, args = facet.args)
   p <- add_my_labs(p, args = labs.args)
   p <- add_my_theme(p, args = theme)
@@ -247,6 +252,21 @@ add_labels <- function(data, repel = TRUE, box = FALSE, ...) {
   add_my_facet(p = p, facets = ~split, args = args, ...)
 }
 
+#' @export
+get_label_data <- function(data, group.by = NULL, ...) {
+  group.by <- group.by %||% "colour"
+  group.by <- c(group.by, "split")
+  group.by <- intersect(group.by, colnames(data))
+  if (length(group.by) == 0) {
+    stop("No valid 'group.by' for summarizing the label positions.")
+  }
+  label.data <- data %>%
+    dplyr::group_by(across(all_of(group.by))) %>%
+    dplyr::summarize(x = median(x), y = median(y))
+  label.data$label <- label.data[[group.by[1]]]
+  label.data
+}
+
 #' @importFrom ggplot2 facet_wrap
 add_my_facet <- function(p, facets, args = list(), ...) {
   fw <- facet_wrap(facets = facets)
@@ -290,3 +310,14 @@ add_my_theme <- function(p, args = list(), ...) {
 auto_point_size <- function(data, raster = NULL) {
   ifelse(isTRUE(raster), 1, min(1, 1583 / nrow(data)))
 }
+
+#' @importFrom ggplot2 guides guide_legend
+#' @export
+dim_plot_guides <- function(...) {
+  args <- list(...)
+  if ("colour" %in% names(args) | "color" %in% names(args)) {
+    return(guides(...))
+  }
+  guides(colour = guide_legend(override.aes = list(size = 3, alpha = 1)), ...)
+}
+

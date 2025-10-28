@@ -180,6 +180,7 @@ MakeSeuratObj <- function(
     min.features = -1
   )
   object$orig.ident <- pdata[Cells(object), "orig.ident"]
+  object$orig.ident <- factor(object$orig.ident, data.names)
 
   object@misc$rowData <- fdata
   object

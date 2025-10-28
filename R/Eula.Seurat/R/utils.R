@@ -8,6 +8,300 @@ Load <- function(file) {
   CheckMySeuratObj(object)
 }
 
+#' @export ModuleScoring
+ModuleScoring <- function(object, ...) {
+  UseMethod("ModuleScoring", object)
+}
+
+#' @importFrom ggplot2 cut_number
+#' @export
+#' @method ModuleScoring default
+ModuleScoring.default <- function(
+    object,
+    features,
+    pool = NULL,
+    nbin = 24,
+    ctrl = 100,
+    seed = 42,
+    name = 'Cluster',
+    ...
+) {
+  if (length(features) == 0) {
+    stop("Missing input feature list")
+  }
+  if (is.character(features)) {
+    features <- list(features)
+    names(features) <- paste0(name, "1")
+  }
+  old.features <- features
+  upper.rownames <- toupper(rownames(object))
+  for (i in seq_along(features)) {
+    features[[i]] <- intersect(toupper(features[[i]]), upper.rownames)
+    which.missing <- which(!toupper(old.features[[i]]) %in% upper.rownames)
+    if (length(which.missing) > 0) {
+      which.missing <- paste(old.features[[i]][which.missing], collapse = ", ")
+      fastWarning("The following features are not found:\n ", which.missing)
+    }
+    if (length(features[[i]]) == 0) {
+      fastWarning("'features[[", i, "]]' contains no valid features.")
+    }
+  }
+  features <- features[lengths(features) > 0]
+  if (length(features) == 0) {
+    stop("No valid features found.")
+  }
+
+  rownames(object) <- upper.rownames
+
+  data.avg <- Matrix::rowMeans(object)
+  data.avg <- data.avg[order(data.avg)]
+  data.cut <- cut_number(
+    x = data.avg + rnorm(n = length(data.avg)) / 1e30,
+    n = nbin,
+    labels = FALSE,
+    right = FALSE
+  )
+  names(data.cut) <- names(data.avg)
+  ctrl.use <- vector(mode = "list", length = length(features))
+  for (i in seq_along(features)) {
+    features.use <- features[[i]]
+    for (j in seq_along(features.use)) {
+      bin <- data.cut[features.use[j]]
+      set.seed(seed)
+      features.ctrl <- names(sample(
+        x = data.cut[data.cut == bin],
+        size = ctrl,
+        replace = FALSE
+      ))
+      ctrl.use[[i]] <- c(ctrl.use[[i]], features.ctrl)
+    }
+    ctrl.use[[i]] <- unique(ctrl.use[[i]])
+  }
+  ctrl.scores <- matrix(0, nrow = length(ctrl.use), ncol = ncol(object))
+  for (i in seq_along(ctrl.use)) {
+    ctrl.scores[i, ] <- Matrix::colMeans(object[ctrl.use[[i]], , drop = FALSE])
+  }
+  features.scores <- matrix(0, nrow = length(features), ncol = ncol(object))
+  for (i in seq_along(features)) {
+    features.scores[i, ] <- Matrix::colMeans(object[features[[i]], ])
+  }
+  features.scores <- features.scores - ctrl.scores
+
+  if (length(names(features)) == 0) {
+    names(features) <- paste0(name, seq_along(features))
+  }
+  rownames(features.scores) <- names(features)
+  features.scores <- as.data.frame(t(features.scores))
+  rownames(features.scores) <- colnames(object)
+  features.scores
+}
+
+#' @importClassesFrom SeuratObject Assay
+#' @export
+#' @method ModuleScoring Assay
+ModuleScoring.Assay <- function(
+    object,
+    features,
+    slot = "data",
+    pool = NULL,
+    nbin = 24,
+    ctrl = 100,
+    seed = 42,
+    name = 'Cluster',
+    ...
+) {
+  ModuleScoring(
+    object = GetAssayData(object, slot),
+    features = features,
+    pool = pool,
+    nbin = nbin,
+    ctrl = ctrl,
+    seed = seed,
+    name = name,
+    ...
+  )
+}
+
+#' @importClassesFrom SeuratObject StdAssay
+#' @export
+#' @method ModuleScoring StdAssay
+ModuleScoring.StdAssay <- function(
+    object,
+    features,
+    slot = "data",
+    pool = NULL,
+    nbin = 24,
+    ctrl = 100,
+    seed = 42,
+    name = 'Cluster',
+    ...
+) {
+  layer_names <- Layers(object, search = slot)
+  output_list <- lapply(layer_names, function(x) {
+    ModuleScoring(
+      object = LayerData(object, layer = x),
+      features = features,
+      pool = pool,
+      nbin = nbin,
+      ctrl = ctrl,
+      seed = seed,
+      name = name,
+      ...
+    )
+  })
+  output_list <- unname(output_list)
+  features.scores.use <- do.call(rbind, output_list)
+  common.cells <- intersect(Cells(object), rownames(features.scores.use))
+  features.scores.use[common.cells, , drop = FALSE]
+}
+
+#' @importClassesFrom SeuratObject Seurat
+#' @export
+#' @method ModuleScoring Seurat
+ModuleScoring.Seurat <- function(
+    object,
+    features,
+    assay = NULL,
+    slot = "data",
+    pool = NULL,
+    nbin = 24,
+    ctrl = 100,
+    seed = 42,
+    name = 'Cluster',
+    ...
+) {
+  assay.old <- DefaultAssay(object = object)
+  assay <- assay %||% assay.old
+  DefaultAssay(object) <- assay
+  features.scores.use <- ModuleScoring(
+    object = object[[assay]],
+    features = features,
+    slot = slot,
+    pool = pool,
+    nbin = nbin,
+    ctrl = ctrl,
+    seed = seed,
+    name = name,
+    ...
+  )
+  object[[colnames(features.scores.use)]] <- features.scores.use
+  DefaultAssay(object) <- assay.old
+  object
+}
+
+#' @export CellCycle
+CellCycle <- function(object, ...) {
+  UseMethod("CellCycle", object)
+}
+
+#' @export
+#' @method CellCycle default
+CellCycle.default <- function(
+    object,
+    s.features,
+    g2m.features,
+    ctrl = NULL,
+    ...
+) {
+  features <- list('S.Score' = s.features, 'G2M.Score' = g2m.features)
+  ctrl <- ctrl %||% min(vapply(features, FUN = length, FUN.VALUE = numeric(1)))
+  cc <- ModuleScoring(object = object, features = features, ctrl = ctrl, ...)
+  cc[['CC.Difference']] <- cc[['S.Score']] - cc[['G2M.Score']]
+
+  assignments <- apply(
+    X = cc,
+    MARGIN = 1,
+    FUN = function(scores, first = 'S', second = 'G2M', null = 'G1') {
+      if (all(scores < 0)) {
+        return(null)
+      }
+      if (length(which(scores == max(scores))) > 1) {
+        return('Undecided')
+      }
+      return(c(first, second)[which.max(scores)])
+    }
+  )
+  cc[["Phase"]] <- factor(assignments, c("G1", "S", "G2M"))
+  cc
+}
+
+#' @export
+#' @method CellCycle Assay
+CellCycle.Assay <- function(
+    object,
+    s.features,
+    g2m.features,
+    slot = "data",
+    ctrl = NULL,
+    ...
+) {
+  CellCycle(
+    object = GetAssayData(object, slot),
+    s.features = s.features,
+    g2m.features = g2m.features,
+    slot = slot,
+    ctrl = ctrl,
+    ...
+  )
+}
+
+#' @export
+#' @method CellCycle StdAssay
+CellCycle.StdAssay <- function(
+    object,
+    s.features,
+    g2m.features,
+    slot = "data",
+    ctrl = NULL,
+    ...
+) {
+  layer_names <- Layers(object, search = slot)
+  output_list <- lapply(layer_names, function(x) {
+    CellCycle(
+      object = LayerData(object, layer = x),
+      s.features = s.features,
+      g2m.features = g2m.features,
+      ctrl = ctrl,
+      ...
+    )
+  })
+  output_list <- unname(output_list)
+  features.scores.use <- do.call(rbind, output_list)
+  common.cells <- intersect(Cells(object), rownames(features.scores.use))
+  features.scores.use[common.cells, , drop = FALSE]
+}
+
+#' @export
+#' @method CellCycle Seurat
+CellCycle.Seurat <- function(
+    object,
+    s.features,
+    g2m.features,
+    assay = NULL,
+    slot = "data",
+    ctrl = NULL,
+    set.ident = FALSE,
+    ...
+) {
+  assay.old <- DefaultAssay(object = object)
+  assay <- assay %||% assay.old
+  DefaultAssay(object) <- assay
+  features.scores.use <- CellCycle(
+    object = object[[assay]],
+    s.features = s.features,
+    g2m.features = g2m.features,
+    ctrl = ctrl,
+    slot = slot,
+    ...
+  )
+  object[[colnames(features.scores.use)]] <- features.scores.use
+  DefaultAssay(object) <- assay.old
+  if (set.ident) {
+    Idents(object) <- "Phase"
+  }
+  object
+}
+
 #' @importFrom SeuratObject FetchData
 #' @importFrom Eula.utils validCharacters
 #' @export

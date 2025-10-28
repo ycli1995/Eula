@@ -13,5 +13,6 @@ RoxygenNote: 7.3.3
 Imports: 
     dplyr,
     Eula.utils,
-    Seurat,
-    SeuratObject
+    Seurat (>= 5.1.0),
+    SeuratObject (>= 5.1.0),
+    tidydr

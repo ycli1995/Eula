@@ -8,7 +8,7 @@ CheckMySeuratObj <- function(object, ...) {
 }
 
 #' @export
-CheckSeuratMetaData <- function(object, parameters = list()) {
+CheckSeuratMetaData <- function(object, column.map = list(), ...) {
   default.cols <- list(
     Samples = "orig.ident",
     Groups = c("group", "Samples"),
@@ -26,10 +26,10 @@ CheckSeuratMetaData <- function(object, parameters = list()) {
     }
   }
 
-  check.cols <- names(default.cols)
+  check.cols <- names(column.map)
   for (i in check.cols) {
-    if (!exists(i, object[[]])) {
-      use.col <- parameters[[i]][1]
+    if (!i %in% colnames(object[[]])) {
+      use.col <- column.map[[i]][1]
       if (length(use.col) == 0) {
         use.col <- intersect(default.cols[[i]], colnames(object[[]]))[1]
       }
@@ -37,7 +37,7 @@ CheckSeuratMetaData <- function(object, parameters = list()) {
         fastWarning("No column found for setting default '", i, "'")
         next
       }
-      if (!exists(use.col, object[[]])) {
+      if (!use.col %in% colnames(object[[]])) {
         fastWarning("'", use.col, "' doesn't exist for default '", i, "'.")
         next
       }
@@ -45,18 +45,21 @@ CheckSeuratMetaData <- function(object, parameters = list()) {
 
       if (length(object@misc$colors[[i]]) > 0) {
         object@misc$colors[[i]] <- checkColorMap(
-          object[[]], i,
+          x = object[[]],
+          column = i,
           colors = object@misc$colors[[i]]
         )
       } else {
         object@misc$colors[[i]] <- checkColorMap(
-          object[[]], use.col,
+          x = object[[]],
+          column = use.col,
           colors = object@misc$colors[[use.col]]
         )
       }
     }
     object@misc$colors[[i]] <- checkColorMap(
-      object[[]], i,
+      x = object[[]],
+      coloumn = i,
       colors = object@misc$colors[[i]]
     )
   }
