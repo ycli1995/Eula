@@ -17,6 +17,7 @@ Imports:
     Matrix,
     qvalue,
     rlang,
+    showtext,
     vctrs,
     yaml
 Suggests: 
