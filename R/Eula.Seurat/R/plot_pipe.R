@@ -1,14 +1,24 @@
 
+#' @importFrom SeuratObject Reductions
 #' @export
 pipe_DimPlot <- function(obj, params = list(), ...) {
-  outdir <- params[['outdir']] %||% getwd()
-  basic.size <- params[['basic.size']] %||% 6
-  reductions <- params[['reductions']] %||% c("umap", "tsne")
+  params[['outdir']] <- params[['outdir']] %||% getwd()
+  params[['basic.size']] <- params[['basic.size']] %||% 6
+  params[['reductions']] <- params[['reductions']] %||% c("umap", "tsne")
+  params[['corner.axis']] <- params[['corner.axis']] %||% TRUE
+
+  print(str(params))
+  list2env(params, envir = environment())
+
+  reductions <- intersect(reductions, Reductions(obj))
+  if (length(reductions) == 0) {
+    stop("No valid reduction in the Seurat object.")
+  }
+
   group.by <- params[['group.by']]
   split.by <- params[['split.by']]
   label <- params[['label']]
   legend <- params[['legend']]
-  corner.axis <- params[['corner.axis']] %||% TRUE
 
   save_multi_DimPlot(
     obj,
@@ -25,6 +35,7 @@ pipe_DimPlot <- function(obj, params = list(), ...) {
 }
 
 #' @importFrom Eula.utils norm_fname
+#' @importFrom Seurat SplitObject
 #' @export
 save_multi_DimPlot <- function(
     obj,
@@ -68,6 +79,7 @@ save_multi_DimPlot <- function(
 }
 
 #' @importFrom ggplot2 ggsave
+#' @importFrom tidydr theme_dr
 #' @export
 save_DimPlot <- function(
     obj,
@@ -84,15 +96,17 @@ save_DimPlot <- function(
   if (length(group.by) == 0) {
     obj$Idents <- Idents(obj)
     group.by <- "Idents"
-    obj@misc$colors$Idents <- SetColor(obj$Idents)
+    obj@misc$colors$Idents <- setColors(obj$Idents)
   }
   obj@meta.data <- droplevels(obj@meta.data)
 
   for (i in group.by) {
     ## colors for each `group.by`
-    obj@misc$colors[[i]] <- checkColorMap(obj, i, obj@misc$colors[[i]])
+    obj <- checkColorMap(obj, i, obj@misc$colors[[i]])
   }
 
+  legend <- legend %||% group.by
+  legend <- intersect(legend, group.by)
   theme <- theme %||% dot_theme_default()
   if (corner.axis) {
     theme <- theme + theme_dr()
@@ -108,12 +122,15 @@ save_DimPlot <- function(
     shape.by = NULL,
     combine = FALSE,
     label.repel = TRUE,
+    legend = legend,
+    theme = theme,
     ...
   )
   if (is.null(outfile)) {
     return(p)
   }
   w <- rep(basic.size, length(p))
+  names(w) <- names(p)
   for (i in names(p)) {
     if (i %in% legend) {
       lgd.ncol <- ceiling(length(unique(p[[i]]$data[["colour"]])) / 20)

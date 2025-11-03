@@ -1,7 +1,9 @@
 
-#' @importFrom ggplot2 element_blank element_rect element_text theme theme_bw
+#' @importFrom ggplot2 element_blank element_line element_rect element_text
+#' margin theme theme_bw
+#' @importFrom grid unit
 #' @export
-dot_theme_default <- function(family = "", ...) {
+dot_theme_default <- function(family = "Arial", ...) {
   theme_bw() +
     theme(
       panel.grid.major = element_blank(),

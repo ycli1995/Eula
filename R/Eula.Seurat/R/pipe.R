@@ -271,7 +271,7 @@ pipe_ScaleData <- function(obj, params = list(), ...) {
     vars.to.regress = vars.to.regress,
     features = features,
     scale.max = scale.max,
-    verbose = FALSE,
+    verbose = TRUE,
     ...
   )
   obj
@@ -414,7 +414,6 @@ pipe_RunUMAP <- function(obj, params = list(), ...) {
     dims <- NULL
   }
 
-  Message("Runing UMAP.")
   obj <- RunUMAP(
     object = obj,
     dims = dims,
@@ -725,5 +724,50 @@ pipe_SeuratClustering_R <- function(params = list(), ...) {
   Message('>>>>> Output some lists: ', outdir)
   WriteRenameConf(obj, outdir)
 
+  setwd(outdir)
+  pipe_PostClustering(obj, params[['PostClustering']])
+
   obj
 }
+
+#' @export
+pipe_PostClustering <- function(obj, params = list(), ...) {
+  Message('>>>>> Running PostClustering')
+
+  params[['outdir']] <- params[['outdir']] %||% getwd()
+  params[['sample.by']] <- params[['sample.by']] %||% "orig.ident"
+  params[['group.by']] <- params[['group.by']] %||% "Groups"
+  params[['cluster.by']] <- params[['cluster.by']] %||% "seurat_clusters"
+  params[['reductions']] <- params[['reductions']] %||% c("tsne", "umap")
+  params[['corner.axis']] <- params[['corner.axis']] %||% TRUE
+  print(str(params))
+  list2env(params, envir = environment())
+
+  if (!group.by %in% colnames(obj[[]])) {
+    obj[[group.by]] <- obj[[sample.by]]
+    obj@misc$colors[[group.by]] <- obj@misc$colors[[sample.by]]
+  }
+
+  save_multi_DimPlot(
+    obj,
+    outdir = outdir,
+    reductions = reductions,
+    group.by = c(sample.by, cluster.by),
+    split.by = sample.by,
+    corner.axis = corner.axis,
+    ...
+  )
+  save_multi_DimPlot(
+    obj,
+    outdir = outdir,
+    reductions = reductions,
+    group.by = c(group.by, cluster.by),
+    split.by = group.by,
+    corner.axis = corner.axis,
+    ...
+  )
+
+  obj
+}
+
+

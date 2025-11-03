@@ -116,7 +116,7 @@ dim_plot.data.frame <- function(
       alpha = pt.alpha,
       ...
     )
-    if (i %in% legend) {
+    if (!i %in% legend) {
       plist[[i]] <- plist[[i]] + theme_no_legend()
     }
   }
