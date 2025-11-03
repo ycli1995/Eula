@@ -136,7 +136,7 @@ ModuleScoring.StdAssay <- function(
     name = 'Cluster',
     ...
 ) {
-  layer_names <- Layers(object, search = slot)
+  layer_names <- SeuratObject::Layers(object, search = slot)
   output_list <- lapply(layer_names, function(x) {
     ModuleScoring(
       object = LayerData(object, layer = x),
@@ -255,10 +255,10 @@ CellCycle.StdAssay <- function(
     ctrl = NULL,
     ...
 ) {
-  layer_names <- Layers(object, search = slot)
+  layer_names <- SeuratObject::Layers(object, search = slot)
   output_list <- lapply(layer_names, function(x) {
     CellCycle(
-      object = LayerData(object, layer = x),
+      object = SeuratObject::LayerData(object, layer = x),
       s.features = s.features,
       g2m.features = g2m.features,
       ctrl = ctrl,
@@ -272,6 +272,7 @@ CellCycle.StdAssay <- function(
 }
 
 #' @export
+#' @importFrom SeuratObject DefaultAssay<-
 #' @method CellCycle Seurat
 CellCycle.Seurat <- function(
     object,
@@ -392,8 +393,10 @@ ShrinkSeuratObject <- function(
 
   if (!scale.data) {
     message("remove 'scale.data' ")
-    if (packageVersion("Seurat") >= 5) {
-      SeuratObject::LayerData(object, layer = "scale.data") <- NULL
+    if (packageVersion("Seurat") >= package_version("5.0.0")) {
+      if (any(dim(SeuratObject::LayerData(object, layer = "scale.data")) > 0)) {
+        SeuratObject::LayerData(object, layer = "scale.data") <- NULL
+      }
     } else {
       object <- SeuratObject::SetAssayData(
         object,

@@ -288,6 +288,11 @@ fetch_color_dataframe <- function(color_table) {
   rename_map
 }
 
+#' @export
+mkdir <- function(path) {
+  dir.create(path, showWarnings = FALSE, recursive = TRUE)
+}
+
 # find_group_index <- function(
 #     mat,
 #     metadata,
@@ -371,6 +376,10 @@ norm_list_param <- function(x, ...) {
     x <- sapply(X = x, FUN = norm_list_param, ..., simplify = FALSE)
     return(unlist(x))
   }
-  return(x)
+  x
 }
 
+#' @export
+norm_fname <- function(x, ...) {
+  gsub("\\/| |\\(|\\)", "_", x)
+}

@@ -193,13 +193,13 @@ WriteRenameConf <- function(
     outdir = getwd(),
     columns = c("Samples", "Groups", "Clusters")
 ) {
-  columns <- intersect(columns, colnames(obj[[]]))
+  columns <- intersect(columns, colnames(object[[]]))
   for (i in columns) {
-    labels <- levels(as.factor(obj[[]][, i]))
+    labels <- levels(as.factor(object[[]][, i]))
     write(labels, file.path(outdir, paste0(i, ".list")))
 
     rename.df <- data.frame(V1 = labels, V2 = labels)
-    colors <- obj@misc$colors[[i]]
+    colors <- object@misc$colors[[i]]
     if (length(colors) > 0) {
       rename.df$V3 <- colors[labels]
     }

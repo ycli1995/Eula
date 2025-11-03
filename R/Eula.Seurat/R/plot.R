@@ -8,6 +8,129 @@ dim_plot <- function(object, ...) {
 #' @importFrom ggplot2 theme_classic
 #'
 #' @export
+#' @method dim_plot data.frame
+dim_plot.data.frame <- function(
+    object,
+    group.by,
+    split.by = NULL,
+    shape.by = NULL,
+
+    dims = c(1, 2),
+    ncol = NULL,
+    key = NULL,
+
+    order = NULL,
+    shuffle = FALSE,
+    seed = 42,
+    combine = TRUE,
+
+    label = NULL,
+    label.repel = TRUE,
+    label.size = 4,
+    label.color = "black",
+    label.box = FALSE,
+
+    legend = NULL,
+
+    colors = NULL,
+    pt.size = NULL,
+    pt.alpha = NULL,
+    raster = NULL,
+    raster.dpi = c(512, 512),
+    facet.args = list(),
+    theme = NULL,
+    ...
+) {
+  orig.groups <- group.by
+  group.by <- intersect(orig.groups, colnames(object))
+  if (length(group.by) == 0) {
+    stop("Invalid 'group.by':\n  ", paste(orig.groups, collapse = ", "))
+  }
+
+  legend <- legend %||% group.by
+
+  colnames(object)[dims] <- c("x", "y")
+
+  split.by <- split.by[1]
+  shape.by <- shape.by[1]
+
+  if (isTRUE(shuffle)) {
+    set.seed(seed)
+    object <- object[sample(seq_len(nrow(object))), , drop = FALSE]
+  }
+
+  if (is.character(colors)) {
+    colors <- sapply(group.by, function(x) colors, simplify = FALSE)
+  }
+
+  labs.args <- setNames(paste0(key, dims), c("x", "y"))
+  labs.args <- as.list(labs.args)
+
+  theme <- theme %||% theme_classic()
+
+  ncol <- ncol %||% 4
+  if (!is.null(split.by)) {
+    theme <- theme + theme_facet()
+    if (length(group.by) > 1) {
+      facet.args[['nrow']] <- 1
+      facet.args[['ncol']] <- NULL
+    }
+  }
+
+  pt.alpha <- pt.alpha %||% 1
+
+  plist <- list()
+  for (i in group.by) {
+    data <- object[, c("x", "y")]
+
+    data[, 'colour'] <- as.factor(object[, i])
+    cols <- colors[[i]]
+
+    label.data <- NULL
+    if (i %in% label) {
+      label.data <- get_label_data(data)
+    }
+    labs.args[["colour"]] <- i
+
+    if (!is.null(split.by)) {
+      data[, 'split'] <- object[, split.by]
+    }
+    if (!is.null(shape.by)) {
+      data[, 'shape'] <- object[, shape.by]
+    }
+
+    plist[[i]] <- single_dim_plot(
+      data = data,
+      colors = cols,
+      label.data = label.data,
+      label.repel = label.repel,
+      label.size = label.size,
+      label.color = label.color,
+      label.box = label.box,
+      pt.size = pt.size,
+      raster = raster,
+      raster.dpi = raster.dpi,
+      facet.args = facet.args,
+      labs.args = labs.args,
+      theme = theme,
+      alpha = pt.alpha,
+      ...
+    )
+    if (i %in% legend) {
+      plist[[i]] <- plist[[i]] + theme_no_legend()
+    }
+  }
+  if (!is.null(split.by)) {
+    ncol <- 1
+  }
+  if (combine) {
+    ncol <- min(ncol, length(plist))
+    plist <- wrap_plots(plist, ncol = ncol)
+  }
+  plist
+}
+
+#' @export
 #' @method dim_plot Seurat
 dim_plot.Seurat <- function(
     object,
@@ -50,17 +173,17 @@ dim_plot.Seurat <- function(
     cells = cells,
     clean = "project"
   )
-  colnames(data)[1:2] <- c("x", "y")
+  key <- key %||% Key(reduc.obj)
 
   if (!is.null(shape.by)) {
     shape.by <- shape.by[1]
-    data[, "shape"] <- object[[shape.by, drop = TRUE]]
+    data[, shape.by] <- object[[shape.by, drop = TRUE]]
   }
   if (!is.null(split.by)) {
     split.by <- split.by[1]
     split <- FetchData(object, vars = split.by, clean = TRUE)[split.by]
     data <- data[rownames(split), ]
-    data[, "split"] <- split
+    data[, split.by] <- split
   }
 
   orig.groups <- group.by
@@ -75,68 +198,36 @@ dim_plot.Seurat <- function(
   group.data <- group.data[rownames(data), , drop = FALSE]
   data <- cbind(data, group.data)
 
-  if (isTRUE(shuffle)) {
-    set.seed(seed)
-    data <- data[sample(seq_len(nrow(data))), , drop = FALSE]
-  }
+  dim_plot(
+    data,
+    group.by = group.by,
+    split.by = split.by,
+    shape.by = shape.by,
 
-  if (is.character(colors)) {
-    colors <- sapply(group.by, function(x) colors, simplify = FALSE)
-  }
+    dims = c(1, 2),
+    ncol = ncol,
+    key = key,
 
-  key <- key %||% Key(reduc.obj)
-  labs.args <- setNames(paste0(key, dims), c("x", "y"))
-  labs.args <- as.list(labs.args)
+    order = order,
+    shuffle = shuffle,
+    seed = seed,
+    combine = combine,
 
-  ncol <- ncol %||% 4
-  if (length(group.by) > 1 & "split" %in% colnames(data)) {
-    facet.args[['nrow']] <- 1
-    facet.args[['ncol']] <- NULL
-  }
+    label = label,
+    label.repel = label.repel,
+    label.size = label.size,
+    label.color = label.color,
+    label.box = label.box,
 
-  theme <- theme %||% theme_classic()
-  if ("split" %in% colnames(data)) {
-    theme <- theme + theme_facet()
-  }
-
-  pt.alpha <- pt.alpha %||% 1
-
-  plist <- list()
-  for (i in group.by) {
-    data$colour <- as.factor(data[[i]])
-    cols <- colors[[i]]
-
-    label.data <- NULL
-    if (i %in% label) {
-      label.data <- get_label_data(data)
-    }
-    labs.args[["colour"]] <- i
-    plist[[i]] <- single_dim_plot(
-      data = data,
-      colors = cols,
-      label.data = label.data,
-      label.repel = label.repel,
-      label.size = label.size,
-      label.color = label.color,
-      label.box = label.box,
-      pt.size = pt.size,
-      raster = raster,
-      raster.dpi = raster.dpi,
-      facet.args = facet.args,
-      labs.args = labs.args,
-      theme = theme,
-      alpha = pt.alpha,
-      ...
-    )
-  }
-  if ("split" %in% colnames(data)) {
-    ncol <- 1
-  }
-  if (combine) {
-    ncol <- min(ncol, length(plist))
-    plist <- wrap_plots(plist, ncol = ncol)
-  }
-  plist
+    colors = colors,
+    pt.size = pt.size,
+    pt.alpha = pt.alpha,
+    raster = raster,
+    raster.dpi = raster.dpi,
+    facet.args = facet.args,
+    theme = theme,
+    ...
+  )
 }
 
 #' @importFrom ggplot2 element_blank element_text theme
@@ -144,8 +235,13 @@ dim_plot.Seurat <- function(
 theme_facet <- function(...) {
   theme(
     strip.background = element_blank(),
-    strip.text = element_text(),
+    strip.text = element_text(size = 12),
     validate = TRUE,
     ...
   )
+}
+
+#' @export
+theme_no_legend <- function(...) {
+  theme(legend.position = "none", validate = TRUE, ...)
 }

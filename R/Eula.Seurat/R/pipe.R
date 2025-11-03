@@ -1,20 +1,23 @@
 
 #' @export
-pipe_RenameObject <- function(obj, parameter = list()) {
+pipe_RenameObject <- function(obj, params = list()) {
+  if (length(params[["RenameObject_yaml"]]) > 0) {
+    file <- normalizePath(params[["RenameObject_yaml"]], mustWork = TRUE)
+    Message("Read 'RenameObject_yaml': ", file)
+    params <- readYAML(file2)
+  }
 
-  print(str(parameter))
+  obj <- RenameSeuratColumns(obj, params[['rename_colnames']])
 
-  obj <- RenameSeuratColumns(obj, parameter[['rename_colnames']])
+  obj <- RenameSeuratWrapper(obj, params[['rename']])
 
-  obj <- RenameSeuratWrapper(obj, parameter[['rename']])
+  obj <- pipe_UpdateSeurat(obj, params[['UpdateSeurat']])
 
-  obj <- pipe_UpdateSeurat(obj, parameter[['UpdateSeurat']])
+  obj <- CheckMySeuratObj(obj, column.map = params$default_colnames)
 
-  obj <- CheckMySeuratObj(obj, column.map = parameter$default_colnames)
+  obj <- pipe_SubsetObject(obj, params[['subset']])
 
-  obj <- pipe_SubsetObject(obj, parameter[['subset']])
-
-  obj <- pipe_ShrinkSeuratObject(obj, parameter)
+  obj <- pipe_ShrinkSeuratObject(obj, params)
 
   Message('>>>>> Finally check...')
   print(obj)
@@ -25,41 +28,41 @@ pipe_RenameObject <- function(obj, parameter = list()) {
 }
 
 #' @export
-pipe_ShrinkSeuratObject <- function(obj, parameter = list(), ...) {
-  parameter$scale.data <- parameter$scale.data %||% FALSE
-  parameter$misc.counts <- parameter$misc.counts %||% TRUE
+pipe_ShrinkSeuratObject <- function(obj, params = list(), ...) {
+  params$scale.data <- params$scale.data %||% FALSE
+  params$misc.counts <- params$misc.counts %||% TRUE
 
-  parameter$assays <- parameter$assays %||% Assays(obj)
-  parameter$assays <- intersect(parameter$assays, Assays(obj))
+  params$assays <- params$assays %||% Assays(obj)
+  params$assays <- intersect(params$assays, Assays(obj))
 
   Message('>>>>> Shrinking Seurat object...')
   obj <- ShrinkSeuratObject(
     object = obj,
-    assays = parameter$assays,
-    scale.data = parameter$scale.data,
-    misc.counts = parameter$misc.counts
+    assays = params$assays,
+    scale.data = params$scale.data,
+    misc.counts = params$misc.counts
   )
   obj
 }
 
 #' @export
-pipe_SubsetObject <- function(obj, parameter = list(), ...) {
-  parameter$cells <- parameter$cells %||% parameter$cells_use
-  parameter$features <- parameter$features %||% parameter$features
+pipe_SubsetObject <- function(obj, params = list(), ...) {
+  params$cells <- params$cells %||% params$cells_use
+  params$features <- params$features %||% params$features
 
   Message('>>>>> Subset Seurat object...')
   cells_features <- get_cells_and_features(
     object = obj,
-    cells = parameter$cells,
-    features = parameter$features,
-    cells_exclude = parameter$cells_exclude,
-    features_exclude = parameter$features_exclude
+    cells = params$cells,
+    features = params$features,
+    cells_exclude = params$cells_exclude,
+    features_exclude = params$features_exclude
   )
 
-  parameter <- parameter[intersect(names(parameter), colnames(obj[[]]))]
+  params <- params[intersect(names(params), colnames(obj[[]]))]
   obj <- SubsetObject(
     object = obj,
-    column_map = parameter,
+    column_map = params,
     cells = cells_features[['cells']],
     features = cells_features[['features']]
   )
@@ -67,25 +70,25 @@ pipe_SubsetObject <- function(obj, parameter = list(), ...) {
 }
 
 #' @export
-pipe_UpdateSeurat <- function(obj, parameter = list(), ...) {
-  parameter$Assay5 <- parameter$Assay5 %||% FALSE
+pipe_UpdateSeurat <- function(obj, params = list(), ...) {
+  params$Assay5 <- params$Assay5 %||% FALSE
 
   Message('>>>>> Check Seurat version...')
-  obj <- UpdateSeuratAll(object = obj, Assay5 = parameter$Assay5)
+  obj <- UpdateSeuratAll(object = obj, Assay5 = params$Assay5)
   obj
 }
 
 #' @export
-pipe_StatFeaturePercentage <- function(obj, parameter = list(), ...) {
-  stat.pct <- parameter[['stat.pct']] %||% TRUE
-  parameter[['stat.pct']] <- NULL
+pipe_StatFeaturePercentage <- function(obj, params = list(), ...) {
+  stat.pct <- params[['stat.pct']] %||% TRUE
+  params[['stat.pct']] <- NULL
 
   Message('>>>>> Stat features')
-  for (i in names(parameter)) {
+  for (i in names(params)) {
     i2 <- gsub("\\/| ", "_", i)
     obj <- StatFeatures(
       object = obj,
-      features = parameter[[i]],
+      features = params[[i]],
       col.name = paste0("percent.", i2),
       stat.pct = stat.pct
     )
@@ -94,23 +97,23 @@ pipe_StatFeaturePercentage <- function(obj, parameter = list(), ...) {
 }
 
 #' @export
-pipe_MakeSeuratObj <- function(parameter) {
-  if (length(parameter) == 0) {
-    stop("'MakeSeuratObj' parameter is empty.")
+pipe_MakeSeuratObj <- function(params) {
+  if (length(params) == 0) {
+    stop("'MakeSeuratObj' params is empty.")
   }
-  data.paths <- parameter[["paths"]]
+  data.paths <- params[["paths"]]
   if (length(data.paths) == 0) {
     stop("No 'paths' for matrices.")
   }
-  data.names <- parameter[["names"]]
+  data.names <- params[["names"]]
   if (length(data.names) != length(data.paths)) {
     stop("'names' must has the same length as 'paths'")
   }
-  name.list <- parameter[['name_list']]
+  name.list <- params[['name_list']]
   if (length(name.list) == 0) {
     stop("No 'name_list' for MakeSeuratObj")
   }
-  assay <- parameter[['assay']] %||% "RNA"
+  assay <- params[['assay']] %||% "RNA"
 
   Message('>>>>> Making Seurat object')
   obj <- MakeSeuratObj(
@@ -122,19 +125,31 @@ pipe_MakeSeuratObj <- function(parameter) {
   obj
 }
 
-pipe_FindVariableFeatures <- function(obj, parameter = list(), ...) {
-  assay <- parameter[['assay']] %||% DefaultAssay(obj)
-  selection.method <- parameter[['selection.method']] %||% "vst"
-  nfeatures <- parameter[['nfeatures']] %||% 2000
+#' @importFrom Seurat FindVariableFeatures
+#' @importFrom SeuratObject VariableFeatures VariableFeatures<-
+#' @export
+pipe_FindVariableFeatures <- function(obj, params = list(), ...) {
+  Message("Runing FindVariableFeatures")
 
-  vfeatures <- norm_list_param(parameter[['vfeatures']])
-  if (length(vfeatures) > 0) {
+  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  params[['vfeatures']] <- norm_list_param(params[['vfeatures']])
+  if (length(params[['vfeatures']]) > 0) {
     Message("Use preset variable features")
+    print(str(params))
+    list2env(params, envir = environment())
+
     vfeatures <- getFeaturesID(obj, features = vfeatures)
     print(str(vfeatures))
     VariableFeatures(obj[[assay]]) <- vfeatures
     return(obj)
   }
+
+  params[['selection.method']] <- params[['selection.method']] %||% "vst"
+  params[['nfeatures']] <- params[['nfeatures']] %||% 2000
+  params[['vfeature.must']] <- norm_list_param(params[['vfeature.must']])
+  params[['vfeature.remove']] <- norm_list_param(params[['vfeature.remove']])
+  print(str(params))
+  list2env(params, envir = environment())
 
   Message("Find variable features")
   obj <- FindVariableFeatures(
@@ -144,15 +159,14 @@ pipe_FindVariableFeatures <- function(obj, parameter = list(), ...) {
     nfeatures = nfeatures,
     ...
   )
-  vfeature.must <- norm_list_param(parameter[['vfeature.must']])
-  if (length(vfeature.must) > 0) {
+
+  if (length(params[['vfeature.must']]) > 0) {
     Message("Check vfeatures required")
     vfeature.must <- getFeaturesID(obj, features = vfeature.must)
     VariableFeatures(obj) <- union(VariableFeatures(obj), vfeature.must)
   }
 
-  vfeature.remove <- norm_list_param(parameter[['vfeature.remove']])
-  if (length(vfeature.remove) > 0) {
+  if (length(params[['vfeature.remove']]) > 0) {
     Message("Check vfeatures excluded")
     vfeature.remove <- getFeaturesID(obj, features = vfeature.remove)
     VariableFeatures(obj) <- setdiff(VariableFeatures(obj), vfeature.remove)
@@ -161,46 +175,64 @@ pipe_FindVariableFeatures <- function(obj, parameter = list(), ...) {
 }
 
 #' @export
-pipe_CellCycleScoring <- function(obj, parameter = list(), ...) {
+pipe_CellCycleScoring <- function(obj, params = list(), ...) {
   Message("Runing cell cycle scoring.")
 
-  s.features <- norm_list_param(parameter[['s.features']]) %0%
+  params[['s.features']] <- norm_list_param(params[['s.features']]) %0%
     Seurat::cc.genes$s.genes
-  g2m.features <- norm_list_param(parameter[['s.features']]) %0%
+  params[['g2m.features']] <- norm_list_param(params[['g2m.features']]) %0%
     Seurat::cc.genes$g2m.genes
-  set.ident <- parameter[['set.ident']] %0% FALSE
-  assay <- parameter[['assay']]
-  slot <- parameter[['slot']] %0% "data"
-  ctrl <- parameter[['ctrl']]
+  params[['s.features']] <- getFeaturesID(obj, params[['s.features']])
+  params[['g2m.features']] <- getFeaturesID(obj, params[['g2m.features']])
 
-  s.features <- getFeaturesID(obj, s.features)
-  g2m.features <- getFeaturesID(obj, g2m.features)
-
-  if (length(s.features) < 2 || length(g2m.features) < 2) {
+  if (any(lengths(params[c('s.features', 'g2m.features')]) < 2)) {
+    print(str(params))
     fastWarning("No enough cell cycle gene (n < 2). Skip cell cycle scoring.")
     return(obj)
   }
+
+  params[['regress']] <- params[['regress']] %||% "diff"
+  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  params[['slot']] <- params[['slot']] %0% "data"
+  params[['set.ident']] <- params[['set.ident']] %0% FALSE
+  print(str(params))
+  list2env(params, envir = environment())
+  ctrl <- params[['ctrl']]
+
+  regress <- match.arg(params[['regress']], c("none", "diff", "all"))
+
   obj <- CellCycle(
     object = obj,
     s.features = s.features,
     g2m.features = g2m.features,
-    set.ident = set.ident,
     set.ident = set.ident,
     slot = slot,
     assay = assay,
     ctrl = ctrl,
     ...
   )
+  if (regress == "none") {
+    return(obj)
+  }
+  if (regress == "diff") {
+    obj@misc$vars.to.regress <- c("CC.Difference", obj@misc$vars.to.regress)
+    return(obj)
+  }
+  obj@misc$vars.to.regress <- c("S.Score", "G2M.Score", obj@misc$vars.to.regress)
   obj
 }
 
+#' @importFrom Seurat NormalizeData
 #' @export
-pipe_NormalizeData <- function(obj, parameter = list(), ...) {
-  method <- parameter[['method']] %||% "LogNormalize"
-  scale.factor <- parameter[['scale.factor']] %||% 10000
-  assay <- parameter[['assay']] %||% DefaultAssay(obj)
+pipe_NormalizeData <- function(obj, params = list(), ...) {
+  Message("Runing NormalizeData")
 
-  Message("Runing NormalizeData.")
+  params[['method']] <- params[['method']] %||% "LogNormalize"
+  params[['scale.factor']] <- params[['scale.factor']] %||% 10000
+  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  print(str(params))
+
+  list2env(params, envir = environment())
   obj <- NormalizeData(
     object = obj,
     assay = assay,
@@ -212,16 +244,27 @@ pipe_NormalizeData <- function(obj, parameter = list(), ...) {
   obj
 }
 
+#' @importFrom Seurat ScaleData
 #' @export
-pipe_ScaleData <- function(obj, parameter = list(), ...) {
-  vars.to.regress <- parameter[['vars.to.regress']]
-  assay <- parameter[['assay']] %||% DefaultAssay(obj)
-  scale.max <- parameter[['scale.max']] %||% 10
-  only.var.features <- parameter[['only.var.features']] %||% TRUE
-
-  features <- if (only.var.features) NULL else rownames(object)
-
+pipe_ScaleData <- function(obj, params = list(), ...) {
   Message("Runing ScaleData.")
+
+  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  params[['vars.to.regress']] <- params[['vars.to.regress']] %||%
+    c(paste0("nCount_", params[['assay']]), "percent.mito")
+  params[['vars.to.regress']] <- unique(c(
+    params[['vars.to.regress']],
+    obj@misc$vars.to.regress
+  ))
+  params[['scale.max']] <- params[['scale.max']] %||% 10
+  params[['only.var.features']] <- params[['only.var.features']] %||% TRUE
+
+  print(str(params))
+  list2env(params, envir = environment())
+
+  vars.to.regress <- intersect(vars.to.regress, colnames(obj[[]]))
+  features <- if (only.var.features) NULL else rownames(obj)
+
   obj <- ScaleData(
     object = obj,
     assay = assay,
@@ -236,57 +279,79 @@ pipe_ScaleData <- function(obj, parameter = list(), ...) {
 
 #' @importFrom Seurat RunPCA
 #' @export
-pipe_RunPCA <- function(obj, parameter = list(), ...) {
-  assay <- parameter[['assay']] %||% DefaultAssay(obj)
-  reduction.name <- parameter[['reduction.name']] %||% "pca"
-  npcs <- parameter[['npcs']] %||% 50
-  rev.pca <- parameter[['rev.pca']] %||% FALSE
-  weight.by.var <- parameter[['weight.by.var']] %||% TRUE
-  reduction.key <- parameter[['reduction.key']] %||% "PC_"
-  seed <- parameter[['seed']] %||% 42
-  approx <- parameter[['approx']] %||% TRUE
-  reduction.surfix <- parameter[['reduction.surfix']] %||% assay
-
+pipe_RunPCA <- function(obj, params = list(), ...) {
   Message("Runing PCA.")
+
+  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  params[['npcs']] <- params[['npcs']] %||% 50
+  params[['rev.pca']] <- params[['rev.pca']] %||% FALSE
+  params[['weight.by.var']] <- params[['weight.by.var']] %||% TRUE
+  params[['seed']] <- params[['seed']] %||% 42
+  params[['approx']] <- params[['approx']] %||% TRUE
+
+  params[['reduction.key']] <- params[['reduction.key']] %||% "PC_"
+  params[['reduction.name']] <- params[['reduction.name']] %||% "pca"
+  params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
+    params[['assay']]
+
+  print(str(params))
+  list2env(params, envir = environment())
+
   obj <- RunPCA(
     object = obj,
     assay = assay,
-    npcs = npcs,
-    rev.pca = rev.pca,
-    weight.by.var = weight.by.var,
+    npcs = params[['npcs']],
+    rev.pca = params[['rev.pca']],
+    weight.by.var = params[['weight.by.var']],
     verbose = FALSE,
     reduction.key = reduction.key,
     reduction.name = reduction.name,
     seed.use = seed,
-    approx = approx,
+    approx = params[['approx']],
     ...
   )
+
+
   obj[[paste0(reduction.name, "_", reduction.surfix)]] <- obj[[reduction.name]]
+  obj@misc$reduction <- list(
+    RunUMAP = reduction.name,
+    RunTSNE = reduction.name,
+    FindNeighbors = reduction.name
+  )
   obj
 }
 
 #' @importFrom SeuratObject Embeddings
 #' @importFrom Seurat RunTSNE
 #' @export
-pipe_RunTSNE <- function(obj, parameter = list(), ...) {
-
-  reduction <- parameter[['reduction']] %||% obj@misc$reduction[['RunTSNE']]
-  reduction <- reduction %||% "pca"
-
-  reduction.surfix <- parameter[['reduction.surfix']] %||% reduction
-  perplexity <- parameter[['perplexity']] %||% 30
-  reduction.name <- parameter[['reduction.name']] %||% "tsne"
-  reduction.key <- parameter[['reduction.key']] %||% "tSNE_"
-  seed <- seed %||% parameter[['seed']] %||% 42
-  dim.embed <- dim.embed %||% parameter[['dim.embed']] %||% 2
-  num.threads <- parameter[['num.threads']] %||% 1
-
-  dims <- parameter[['dims']] %0%
-    seq_len(ncol(Embeddings(obj, reduction = reduction)))
-
-  perplexity <- min(perplexity, floor((ncol(obj) - 1)/3))
+pipe_RunTSNE <- function(obj, params = list(), ...) {
+  run <- params[['run']] %||% TRUE
+  if (!run) {
+    fastWarning("'run' is FALSE. Skip running tSNE.")
+    return(obj)
+  }
 
   Message("Runing tSNE.")
+  params[['reduction']] <- params[['reduction']] %||%
+    obj@misc$reduction[['RunTSNE']]
+  params[['reduction']] <- params[['reduction']] %||% "pca"
+
+  params[['reduction.key']] <- params[['reduction.key']] %||% "tSNE_"
+  params[['seed']] <- params[['seed']] %||% 42
+  params[['dim.embed']] <- params[['dim.embed']] %||% 2
+  params[['num.threads']] <- params[['num.threads']] %||% 1
+  params[['dims']] <- params[['dims']] %0%
+    seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
+
+  params[['perplexity']] <- params[['perplexity']] %||% 30
+  params[['reduction.name']] <- params[['reduction.name']] %||% "tsne"
+  params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
+    params[['reduction']]
+
+  print(str(params))
+  list2env(params, envir = environment())
+  perplexity <- min(perplexity, floor((ncol(obj) - 1)/3))
+
   obj <- RunTSNE(
     object = obj,
     reduction = reduction,
@@ -307,34 +372,46 @@ pipe_RunTSNE <- function(obj, parameter = list(), ...) {
 #' @importFrom Seurat RunUMAP
 #' @importFrom SeuratObject Embeddings
 #' @export
-pipe_RunUMAP <- function(obj, parameter = list(), ...) {
-  reduction <- parameter[['reduction']] %||% obj@misc$reduction[['RunUMAP']]
-  reduction <- reduction %||% "pca"
+pipe_RunUMAP <- function(obj, params = list(), ...) {
+  run <- params[['run']] %||% TRUE
+  if (!run) {
+    fastWarning("'run' is FALSE. Skip running UMAP.")
+    return(obj)
+  }
 
-  reduction.surfix <- parameter[['reduction.surfix']] %||% reduction
-  reduction.name <- parameter[['reduction.name']] %||% "umap"
-  reduction.key <- parameter[['reduction.key']] %||% "UMAP_"
-  seed <- seed %||% parameter[['seed']] %||% 42
-  dim.embed <- dim.embed %||% parameter[['dim.embed']] %||% 2
+  Message("Runing UMAP.")
+  params[['reduction']] <- params[['reduction']] %||%
+    obj@misc$reduction[['RunUMAP']]
+  params[['reduction']] <- params[['reduction']] %||% "pca"
 
-  graph <- parameter[["graph"]]
-  assay <- parameter[['assay']]
-  nn.name <- parameter[['nn.name']]
-  umap.method <- parameter[['umap.method']] %||% "uwot"
-  reduction.model <- parameter[['reduction.model']]
-  n.neighbors <- parameter[['n.neighbors']] %||% 30
-  metric <- parameter[['metric']] %||% "cosine"
-  n.epochs <- parameter[['n.epochs']]
-  learning.rate <- parameter[['learning.rate']] %||% 1
-  min.dist <- parameter[['min.dist']] %||% 0.3
-  spread <- parameter[["spread"]] %||% 1
-  set.op.mix.ratio <- parameter[['set.op.mix.ratio']] %||% 1
-  local.connectivity <- parameter[['local.connectivity']]
+  params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
+    params[['reduction']]
+  params[['reduction.name']] <- params[['reduction.name']] %||% "umap"
+  params[['reduction.key']] <- params[['reduction.key']] %||% "UMAP_"
+  params[['seed']] <- params[['seed']] %||% 42
+  params[['dim.embed']] <- params[['dim.embed']] %||% 2
+  params[['umap.method']] <- params[['umap.method']] %||% "uwot"
+  params[['n.neighbors']] <- params[['n.neighbors']] %||% 30
+  params[['metric']] <- params[['metric']] %||% "cosine"
+  params[['learning.rate']] <- params[['learning.rate']] %||% 1
+  params[['local.connectivity']] <- params[['local.connectivity']] %||% 1
+  params[['min.dist']] <- params[['min.dist']] %||% 0.3
+  params[["spread"]] <- params[["spread"]] %||% 1
+  params[['set.op.mix.ratio']] <- params[['set.op.mix.ratio']] %||% 1
+  params[['dims']] <- params[['dims']] %0%
+    seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
 
-  dims <- NULL
-  if (is.null(nn.name)) {
-    dims <- parameter[['dims']] %0%
-      seq_len(ncol(Embeddings(obj, reduction = reduction)))
+  print(str(params))
+  list2env(params, envir = environment())
+
+  graph <- params[["graph"]]
+  assay <- params[['assay']]
+  nn.name <- params[['nn.name']]
+  reduction.model <- params[['reduction.model']]
+  n.epochs <- params[['n.epochs']]
+
+  if (!is.null(nn.name)) {
+    dims <- NULL
   }
 
   Message("Runing UMAP.")
@@ -369,19 +446,25 @@ pipe_RunUMAP <- function(obj, parameter = list(), ...) {
 
 #' @importFrom Seurat FindClusters FindNeighbors
 #' @export
-pipe_FindClusters <- function(obj, parameter = list(), ...) {
-  reduction <- parameter[['reduction']] %||%
+pipe_FindClusters <- function(obj, params = list(), ...) {
+  run <- params[['run']] %||% TRUE
+  if (!run) {
+    fastWarning("'run' is FALSE. Skip running FindClusters.")
+    return(obj)
+  }
+
+  reduction <- params[['reduction']] %||%
     obj@misc$reduction[['FindNeighbors']]
   reduction <- reduction %||% "pca"
 
-  assay <- parameter[['assay']] %||% DefaultAssay(obj)
-  k.param <- parameter[['k.param']] %||% 20
-  prune.SNN <- parameter[['prune.SNN']] %||% 1/15
-  n.trees <- parameter[['n.trees']] %||% 50
-  graph.name <- parameter[['graph.name']]
-  l2.norm <- parameter[['l2.norm']] %||% FALSE
+  assay <- params[['assay']] %||% DefaultAssay(obj)
+  k.param <- params[['k.param']] %||% 20
+  prune.SNN <- params[['prune.SNN']] %||% 1/15
+  n.trees <- params[['n.trees']] %||% 50
+  graph.name <- params[['graph.name']]
+  l2.norm <- params[['l2.norm']] %||% FALSE
 
-  dims <- parameter[['dims']] %0%
+  dims <- params[['dims']] %0%
     seq_len(ncol(Embeddings(obj, reduction = reduction)))
 
   Message("Runing FindNeighbors.")
@@ -399,11 +482,11 @@ pipe_FindClusters <- function(obj, parameter = list(), ...) {
     ...
   )
 
-  cluster.name <- parameter[['cluster.name']] %||% "seurat_clusters"
-  resolution <- parameter[['resolution']] %||% 0.5
-  algorithm <- parameter[['algorithm']] %||% "leiden"
-  seed <- parameter[['seed']] %||% 42
-  group.singletons <- parameter[['group.singletons']] %||% TRUE
+  cluster.name <- params[['cluster.name']] %||% "seurat_clusters"
+  resolution <- params[['resolution']] %||% 0.5
+  algorithm <- params[['algorithm']] %||% "leiden"
+  seed <- params[['seed']] %||% 42
+  group.singletons <- params[['group.singletons']] %||% TRUE
   if (seed < 1) {
     seed <- 1
   }
@@ -427,27 +510,47 @@ pipe_FindClusters <- function(obj, parameter = list(), ...) {
     type = "tsne",
     tag = "set1"
   )
+
+  obj[['Clusters']] <- obj[[cluster.name]]
+  obj@misc$colors[['Clusters']] <- obj@misc$colors[[cluster.name]]
   obj
 }
 
 #' @importFrom Seurat CCAIntegration IntegrateLayers RPCAIntegration
 #' @importFrom harmony RunHarmony
 #' @export
-pipe_IntegrateData <- function(obj, parameter = list(), ...) {
-  method <- parameter[['method']] %||% "harmony"
-  split.by <- parameter[['split.by']] %||% "orig.ident"
-  reduction <- parameter[['reduction']] %||% "pca"
-  assay <- parameter[['assay']] %||% DefaultAssay(obj)
+pipe_IntegrateData <- function(obj, params = list(), ...) {
+  run <- params[['run']] %||% TRUE
+  if (!run) {
+    fastWarning("'run' is FALSE. Skip running IntegrateData.")
+    return(obj)
+  }
 
-  method <- match.arg(method, choices = c("harmony", "CCA", "RPCA"))
+  Message('>>>>> Running IntegrateData')
+  params[['split.by']] <- params[['split.by']] %||% "orig.ident"
+  split.by <- params[['split.by']]
+  if (length(unique(obj[[split.by, drop = TRUE]])) == 1) {
+    fastWarning("Only 1 batch. No need for integration.")
+    return(obj)
+  }
 
+  params[['method']] <- params[['method']] %||% "harmony"
+  params[['reduction']] <- params[['reduction']] %||% "pca"
+  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  assay <- params[['assay']]
+  reduction <- params[['reduction']]
+
+  method <- match.arg(params[['method']], choices = c("harmony", "CCA", "RPCA"))
   default.new.reduc <- switch(
     method,
     harmony = "harmony",
-    CCA = "cca_integrated",
-    RPCA = "rpca_integrated"
+    CCA = "cca.integrated",
+    RPCA = "rpca.integrated"
   )
-  new.reduction <- parameter[['new.reduction']] %||% default.new.reduc
+
+  params[['new.reduction']] <- params[['new.reduction']] %||% default.new.reduc
+  new.reduction <- params[['new.reduction']]
+
   obj@misc$reduction <- list(
     RunUMAP = new.reduction,
     RunTSNE = new.reduction,
@@ -455,17 +558,20 @@ pipe_IntegrateData <- function(obj, parameter = list(), ...) {
   )
 
   if (method == "harmony") {
-    theta <- parameter[['theta']] %||% 2
+    params[['theta']] <- params[['theta']] %||% 2
+    print(str(params))
     obj <- RunHarmony(
       object = obj,
       group.by.vars = split.by,
       project.dim = TRUE,
+      reduction.use = params[['reduction']],
       assay.use = assay,
       reduction.save = new.reduction,
       ...
     )
     return(obj)
   }
+  print(str(params))
   method.f <- switch(
     method,
     CCA = CCAIntegration,
@@ -490,11 +596,11 @@ pipe_IntegrateData <- function(obj, parameter = list(), ...) {
   obj
 }
 
-
-
 #' @export
-pipe_StatFilterCells <- function(obj, parameter = list(), ...) {
-  group.by <- parameter[['group.by']] %||% "Samples"
+pipe_StatFilterCells <- function(obj, params = list(), ...) {
+  outdir <- params[['outdir']] %||% getwd()
+
+  group.by <- params[['group.by']] %||% "Samples"
   group.by <- intersect(group.by, colnames(obj[[]]))
 
   Message('>>>>> Stat filtered cells')
@@ -512,33 +618,112 @@ pipe_StatFilterCells <- function(obj, parameter = list(), ...) {
     filtered = filtered[, common.cols, drop = FALSE],
     group.by = group.by
   )
-  group.by <- paste(group.by, collapse = ".")
-  writeTable(df, paste0("FilterCells.Stat.", group.by, ".xls"))
+  outfile <- paste(c("FilterCells.Stat", group.by, "xls"), collapse = ".")
+  writeTable(df, file.path(outdir, outfile))
 }
 
 #' @export
-pipe_MakeSeuratObj_R <- function(parameter) {
-  checkKeys(parameter, "MakeSeuratObj")
+pipe_GetSeuratObj <- function(params = list(), ...) {
+  obj <- params[['obj']]
+  if (!is(obj, "Seurat")) {
+    obj_file <- normalizePath(params[['obj_file']], mustWork = TRUE)
+    obj <- Load(obj_file)
+  }
 
-  obj <- pipe_MakeSeuratObj(parameter[["MakeSeuratObj"]])
+  obj <- pipe_RenameObject(obj, params)
+  obj
+}
 
-  obj <- pipe_StatFeaturePercentage(obj, parameter[["StatFeaturePercentage"]])
+#' @export
+pipe_MakeSeuratObj_R <- function(params) {
+  outfile <- params[['obj_out']] %||% file.path(getwd(), "obj.Rda")
+  outdir <- dirname(outfile)
 
-  obj <- RenameSeuratColumns(obj, parameter[['rename_colnames']])
+  checkKeys(params, "MakeSeuratObj")
 
-  obj <- RenameSeuratWrapper(obj, parameter[['rename']])
+  obj <- pipe_MakeSeuratObj(params[["MakeSeuratObj"]])
 
-  obj <- pipe_UpdateSeurat(obj, parameter[['UpdataSeurat']])
+  obj <- pipe_StatFeaturePercentage(obj, params[["StatFeaturePercentage"]])
 
-  obj <- CheckMySeuratObj(obj, column.map = parameter[['default_colnames']])
+  obj <- RenameSeuratColumns(obj, params[['rename_colnames']])
+
+  obj <- RenameSeuratWrapper(obj, params[['rename']])
+
+  obj <- pipe_UpdateSeurat(obj, params[['UpdataSeurat']])
+
+  obj <- CheckMySeuratObj(obj, column.map = params[['default_colnames']])
 
   obj@misc$colData <- obj[[]]
 
-  obj <- pipe_SubsetObject(obj, parameter[['subset']])
+  obj <- pipe_SubsetObject(obj, params[['subset']])
 
-  pipe_StatFilterCells(obj)
+  mkdir(outdir)
+  params[['StatFilterCells']][['outdir']] <- outdir
+  pipe_StatFilterCells(obj, params[['StatFilterCells']])
+
+  Message('>>>>> Save object to: ', outfile)
+  save(obj, file = outfile)
+
+  Message('>>>>> Output some lists: ', outdir)
+  WriteRenameConf(obj, outdir)
 
   obj
 }
 
+#' @export
+pipe_RenameObject_R <- function(params = list(), ...) {
+  outfile <- params[['obj_out']]
+  if (length(outfile) == 0) {
+    stop("Missing 'obj_out' params.")
+  }
+  if (is.na(outfile)) {
+    stop("Invalid 'obj_out' params.")
+  }
 
+  obj <- pipe_GetSeuratObj(params, ...)
+
+  outdir <- dirname(outfile)
+  mkdir(outdir)
+  Message('>>>>> Save object to: ', outfile)
+  save(obj, file = outfile)
+
+  Message('>>>>> Output some lists: ', outdir)
+  WriteRenameConf(obj, outdir)
+
+  obj
+}
+
+#' @export
+pipe_SeuratClustering_R <- function(params = list(), ...) {
+  outdir <- params[['outdir']] %||% getwd()
+
+  obj <- pipe_GetSeuratObj(params)
+
+  obj <- pipe_NormalizeData(obj, params[['NormalizeData']])
+
+  obj <- pipe_FindVariableFeatures(obj, params[['FindVariableFeatures']])
+
+  obj <- pipe_CellCycleScoring(obj, params[['CellCycleScoring']])
+
+  obj <- pipe_ScaleData(obj, params[['ScaleData']])
+
+  obj <- pipe_RunPCA(obj, params[['RunPCA']])
+
+  obj <- pipe_IntegrateData(obj, params[['IntegrateData']])
+
+  obj <- pipe_RunTSNE(obj, params[['RunTSNE']])
+
+  obj <- pipe_RunUMAP(obj, params[['RunUMAP']])
+
+  obj <- pipe_FindClusters(obj, params[['FindClusters']])
+
+  outfile <- file.path(outdir, "obj.Rda")
+  mkdir(outdir)
+  Message('>>>>> Save object to: ', outfile)
+  save(obj, file = outfile)
+
+  Message('>>>>> Output some lists: ', outdir)
+  WriteRenameConf(obj, outdir)
+
+  obj
+}
