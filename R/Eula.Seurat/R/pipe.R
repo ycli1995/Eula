@@ -748,6 +748,7 @@ pipe_PostClustering <- function(obj, params = list(), ...) {
     obj@misc$colors[[group.by]] <- obj@misc$colors[[sample.by]]
   }
 
+  Message('>>>>> Plotting DimPlot')
   save_multi_DimPlot(
     obj,
     outdir = outdir,
@@ -767,7 +768,19 @@ pipe_PostClustering <- function(obj, params = list(), ...) {
     ...
   )
 
+  Message('>>>>> Get average expression')
+  out.names <- c(Samples = sample.by, Groups = group.by, Clusters = cluster.by)
+  for (i in names(out.names)) {
+    outfile <- paste0("AllGene.", i, ".avg_exp.xls")
+    CalAvgExp(obj, group.by = out.names[i], outfile = outfile)
+
+    outfile <- paste0("AllGene.", i, ".avg_pct.xls")
+    CalAvgPct(obj, group.by = out.names[i], outfile = outfile)
+  }
+
+  Message('>>>>> Get clustering results')
+  df <- FetchSeuratData(obj, out.names)
+  writeTable(df, "Cells.cluster.list.xls")
+
   obj
 }
-
-

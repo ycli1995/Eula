@@ -17,10 +17,14 @@ Imports:
     Matrix,
     qvalue,
     rlang,
+    ROCR,
     showtext,
     vctrs,
     yaml
 Suggests: 
+    DESeq2,
     ggrastr,
+    limma,
+    MAST,
     randomcoloR,
     scattermore
