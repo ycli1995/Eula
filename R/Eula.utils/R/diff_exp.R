@@ -1,10 +1,18 @@
 
+#' @export
+#' @concept data
+DE.METHODS <- list(
+  counts = c(),
+  nocorrect = c("roc"),
+  noprefilter = c("DESeq2"),
+  latent = c("MAST")
+)
+
 #' @export differExp
 differExp <- function(object, ...) {
   UseMethod("differExp", object)
 }
 
-#' @importFrom stats p.adjust
 #' @export
 #' @method differExp CsparseMatrix
 differExp.CsparseMatrix <- function(
@@ -35,13 +43,10 @@ differExp.CsparseMatrix <- function(
     cells.2 = cells.2,
     min.cells.group = min.cells.group
   )
-  if (!(test.use %in% .de_methods_latent()) && !is.null(latent.vars)) {
-    fastWarning(
-      "'latent.vars' is only used for the following tests: ",
-      paste(.de_methods_latent, collapse = ", "),
-    )
+  if (test.use %in% DE.METHODS$noprefilter) {
+    min.diff.pct <- -Inf
+    logfc.threshold <- 0
   }
-
   fc.results <- selectDE(
     object = object,
     cells.1 = cells.1,
@@ -54,8 +59,7 @@ differExp.CsparseMatrix <- function(
     only.pos = only.pos,
     min.exp = min.exp,
     pseudocount.use = pseudocount.use,
-    base = base,
-    ...
+    base = base
   )
   if (nrow(fc.results) == 0) {
     if (test.use == "roc") {
@@ -79,71 +83,22 @@ differExp.CsparseMatrix <- function(
       cells.2 <- sample(cells.2, size = max.cells.per.ident)
     }
   }
-  if (!is.null(latent.vars)) {
-    latent.vars <- latent.vars[c(cells.1, cells.2), , drop = FALSE]
-  }
-
   # Actually perform the DE test
-  total.features <- nrow(object)
-  object <- object[rownames(fc.results), c(cells.1, cells.2), drop = FALSE]
-  if (densify) {
-    object <- as.matrix(object)
-  }
-  de.results <- switch(
-    EXPR = test.use,
-    'wilcox' = differWilcox(
-      object = object,
-      cells.1 = cells.1,
-      cells.2 = cells.2,
-      ...
-    ),
-    'wilcox_limma' = differWilcox(
-      object = object,
-      cells.1 = cells.1,
-      cells.2 = cells.2,
-      limma = TRUE,
-      ...
-    ),
-    'roc' = differROC(
-      object = object,
-      cells.1 = cells.1,
-      cells.2 = cells.2
-    ),
-    't' = differTTest(
-      object = object,
-      cells.1 = cells.1,
-      cells.2 = cells.2
-    ),
-    'MAST' = differMAST(
-      object = object,
-      cells.1 = cells.1,
-      cells.2 = cells.2,
-      latent.vars = latent.vars,
-      ...
-    ),
-    "DESeq2" = differDESeq2(
-      object = object,
-      cells.1 = cells.1,
-      cells.2 = cells.2,
-      ...
-    ),
-    stop("Unknown test: ", test.use)
+  de.results <- testDE(
+    object,
+    cells.1 = cells.1,
+    cells.2 = cells.2,
+    features = rownames(fc.results),
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    latent.vars = latent.vars,
+    densify = densify,
+    ...
   )
-  de.results <- cbind(
-    fc.results,
-    de.results[rownames(fc.results), , drop = FALSE]
-  )
-  if (test.use %in% .de_methods_nocorrect()) {
-    return(de.results)
-  }
-  de.results$p_val_adj <- p.adjust(
-    p = de.results$p_val,
-    method = p.adjust.method,
-    n = total.features
-  )
-  de.results
+  cbind(fc.results, de.results[rownames(fc.results), , drop = FALSE])
 }
 
+#' @importFrom stats p.adjust
 #' @export
 #' @method differExp matrix
 differExp.matrix <- function(
@@ -191,10 +146,6 @@ differExp.matrix <- function(
     ...
   )
 }
-
-.de_methods_latent <- function() c("MAST")
-.de_methods_noprefilter <- function() c("DESeq2")
-.de_methods_nocorrect <- function() c("roc")
 
 #'@export
 selectDE <- function(
@@ -247,6 +198,114 @@ selectDE <- function(
     )
   }
   fc.results[features, , drop = FALSE]
+}
+
+#' @export testDE
+testDE <- function(object, ...) {
+  UseMethod("testDE", object)
+}
+
+#' @export
+#' @method testDE CsparseMatrix
+testDE.CsparseMatrix <- function(
+    object,
+    cells.1 = NULL,
+    cells.2 = NULL,
+    features = NULL,
+    test.use = "wilcox",
+    p.adjust.method = "bonferroni",
+    latent.vars = NULL,
+    densify = FALSE,
+    ...
+) {
+  if (!(test.use %in% DE.METHODS$latent) && !is.null(latent.vars)) {
+    fastWarning(
+      "'latent.vars' is only used for the following tests: ",
+      paste(DE.METHODS$latent, collapse = ", "),
+    )
+  }
+  total.features <- nrow(object)
+  features <- features %||% rownames(object)
+  object <- object[features, c(cells.1, cells.2), drop = FALSE]
+  if (!is.null(latent.vars)) {
+    latent.vars <- latent.vars[c(cells.1, cells.2), , drop = FALSE]
+  }
+  if (densify) {
+    object <- as.matrix(object)
+  }
+  de.results <- switch(
+    EXPR = test.use,
+    'wilcox' = differWilcox(
+      object = object,
+      cells.1 = cells.1,
+      cells.2 = cells.2,
+      ...
+    ),
+    'wilcox_limma' = differWilcox(
+      object = object,
+      cells.1 = cells.1,
+      cells.2 = cells.2,
+      limma = TRUE,
+      ...
+    ),
+    'roc' = differROC(
+      object = object,
+      cells.1 = cells.1,
+      cells.2 = cells.2
+    ),
+    't' = differTTest(
+      object = object,
+      cells.1 = cells.1,
+      cells.2 = cells.2
+    ),
+    'MAST' = differMAST(
+      object = object,
+      cells.1 = cells.1,
+      cells.2 = cells.2,
+      latent.vars = latent.vars,
+      ...
+    ),
+    "DESeq2" = differDESeq2(
+      object = object,
+      cells.1 = cells.1,
+      cells.2 = cells.2,
+      ...
+    ),
+    stop("Unknown test: ", test.use)
+  )
+  if (test.use %in% DE.METHODS$nocorrect) {
+    return(de.results)
+  }
+  de.results$p_val_adj <- p.adjust(
+    p = de.results$p_val,
+    method = p.adjust.method,
+    n = total.features
+  )
+  de.results
+}
+
+#' @export
+#' @method testDE matrix
+testDE.matrix <- function(
+    object,
+    cells.1 = NULL,
+    cells.2 = NULL,
+    features = NULL,
+    test.use = "wilcox",
+    p.adjust.method = "bonferroni",
+    latent.vars = NULL,
+    ...
+) {
+  testDE.CsparseMatrix(
+    object = object,
+    cells.1 = cells.1,
+    cells.2 = cells.2,
+    features = features,
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    latent.vars = latent.vars,
+    ...
+  )
 }
 
 #' @export foldChange

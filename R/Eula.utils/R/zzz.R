@@ -3,6 +3,6 @@
 "_PACKAGE"
 
 .onLoad <- function(libname, pkgname) {
-  library(showtext)
+  require("showtext", quietly = TRUE)
   showtext_auto()
 }
