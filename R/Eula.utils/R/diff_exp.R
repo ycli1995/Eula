@@ -17,8 +17,8 @@ differExp <- function(object, ...) {
 #' @method differExp CsparseMatrix
 differExp.CsparseMatrix <- function(
     object,
-    cells.1 = NULL,
-    cells.2 = NULL,
+    cells.1,
+    cells.2,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     max.cells.per.ident = Inf,
@@ -47,42 +47,24 @@ differExp.CsparseMatrix <- function(
     min.diff.pct <- -Inf
     logfc.threshold <- 0
   }
-  fc.results <- selectDE(
-    object = object,
+  fc.results <- foldChange(
+    object,
     cells.1 = cells.1,
     cells.2 = cells.2,
     mean.fxn = mean.fxn,
-    logfc.threshold = logfc.threshold,
-    min.pct = min.pct,
-    min.diff.pct = min.diff.pct,
-    min.cells.feature = min.cells.feature,
-    only.pos = only.pos,
     min.exp = min.exp,
     pseudocount.use = pseudocount.use,
     base = base
   )
-  if (nrow(fc.results) == 0) {
-    if (test.use == "roc") {
-      empty.df <- as.data.frame(matrix(nrow = 0, ncol = 2))
-      colnames(empty.df) <- c("AUC", "power")
-      return(cbind(fc.results, empty.df))
-    }
-    empty.df <- as.data.frame(matrix(nrow = 0, ncol = 1))
-    colnames(empty.df) <- "p_val"
-    return(cbind(fc.results, empty.df))
-  }
+  fc.results <- selectDE(
+    fc.results = fc.results,
+    logfc.threshold = logfc.threshold,
+    min.pct = min.pct,
+    min.diff.pct = min.diff.pct,
+    min.cells.feature = min.cells.feature,
+    only.pos = only.pos
+  )
 
-  # subsample cell groups if they are too large
-  if (max.cells.per.ident < Inf) {
-    if (length(cells.1) > max.cells.per.ident) {
-      set.seed(seed)
-      cells.1 <- sample(cells.1, size = max.cells.per.ident)
-    }
-    if (length(cells.2) > max.cells.per.ident) {
-      set.seed(seed)
-      cells.2 <- sample(cells.2, size = max.cells.per.ident)
-    }
-  }
   # Actually perform the DE test
   de.results <- testDE(
     object,
@@ -91,11 +73,13 @@ differExp.CsparseMatrix <- function(
     features = rownames(fc.results),
     test.use = test.use,
     p.adjust.method = p.adjust.method,
+    min.cells.group = min.cells.group,
+    max.cells.per.ident = max.cells.per.ident,
     latent.vars = latent.vars,
     densify = densify,
     ...
   )
-  cbind(fc.results, de.results[rownames(fc.results), , drop = FALSE])
+  cbind(fc.results[rownames(de.results), , drop = FALSE], de.results)
 }
 
 #' @importFrom stats p.adjust
@@ -103,8 +87,8 @@ differExp.CsparseMatrix <- function(
 #' @method differExp matrix
 differExp.matrix <- function(
     object,
-    cells.1 = NULL,
-    cells.2 = NULL,
+    cells.1,
+    cells.2,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     max.cells.per.ident = Inf,
@@ -149,30 +133,16 @@ differExp.matrix <- function(
 
 #'@export
 selectDE <- function(
-    object,
-    cells.1,
-    cells.2,
-    mean.fxn = rowExpMean,
+    fc.results,
     logfc.threshold = 0.1,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
-    only.pos = FALSE,
-    min.exp = 0,
-    pseudocount.use = 1,
-    base = 2,
-    ...
+    only.pos = FALSE
 ) {
-  fc.results <- foldChange(
-    object,
-    cells.1,
-    cells.2,
-    mean.fxn = mean.fxn,
-    min.exp = min.exp,
-    pseudocount.use = pseudocount.use,
-    base = base,
-    ...
-  )
+  if (logfc.threshold < 0) {
+    stop("'logfc.threshold' must be >= 0.")
+  }
   if (only.pos) {
     selected <- fc.results[, 1] > logfc.threshold
   } else {
@@ -209,12 +179,15 @@ testDE <- function(object, ...) {
 #' @method testDE CsparseMatrix
 testDE.CsparseMatrix <- function(
     object,
-    cells.1 = NULL,
-    cells.2 = NULL,
+    cells.1,
+    cells.2,
     features = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     latent.vars = NULL,
+    min.cells.group = 3,
+    max.cells.per.ident = Inf,
+    seed = 42,
     densify = FALSE,
     ...
 ) {
@@ -224,8 +197,36 @@ testDE.CsparseMatrix <- function(
       paste(DE.METHODS$latent, collapse = ", "),
     )
   }
+  .validate_cell_groups(
+    data.use = object,
+    cells.1 = cells.1,
+    cells.2 = cells.2,
+    min.cells.group = min.cells.group
+  )
   total.features <- nrow(object)
   features <- features %||% rownames(object)
+  if (length(features) == 0) {
+    if (test.use == "roc") {
+      empty.df <- as.data.frame(matrix(nrow = 0, ncol = 2))
+      colnames(empty.df) <- c("AUC", "power")
+      return(empty.df)
+    }
+    empty.df <- as.data.frame(matrix(nrow = 0, ncol = 1))
+    colnames(empty.df) <- "p_val"
+    return(empty.df)
+  }
+
+  # subsample cell groups if they are too large
+  if (max.cells.per.ident < Inf) {
+    if (length(cells.1) > max.cells.per.ident) {
+      set.seed(seed)
+      cells.1 <- sample(cells.1, size = max.cells.per.ident)
+    }
+    if (length(cells.2) > max.cells.per.ident) {
+      set.seed(seed)
+      cells.2 <- sample(cells.2, size = max.cells.per.ident)
+    }
+  }
   object <- object[features, c(cells.1, cells.2), drop = FALSE]
   if (!is.null(latent.vars)) {
     latent.vars <- latent.vars[c(cells.1, cells.2), , drop = FALSE]
@@ -273,6 +274,10 @@ testDE.CsparseMatrix <- function(
     ),
     stop("Unknown test: ", test.use)
   )
+  if (test.use == "roc") {
+    return(de.results[order(de.results$AUC, decreasing = TRUE), , drop = FALSE])
+  }
+  de.results <- de.results[order(de.results$p_val), , drop = FALSE]
   if (test.use %in% DE.METHODS$nocorrect) {
     return(de.results)
   }
@@ -288,12 +293,14 @@ testDE.CsparseMatrix <- function(
 #' @method testDE matrix
 testDE.matrix <- function(
     object,
-    cells.1 = NULL,
-    cells.2 = NULL,
+    cells.1,
+    cells.2,
     features = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     latent.vars = NULL,
+    max.cells.per.ident = Inf,
+    seed = 42,
     ...
 ) {
   testDE.CsparseMatrix(
@@ -304,6 +311,9 @@ testDE.matrix <- function(
     test.use = test.use,
     p.adjust.method = p.adjust.method,
     latent.vars = latent.vars,
+    max.cells.per.ident = max.cells.per.ident,
+    seed = seed,
+    densify = FALSE,
     ...
   )
 }
@@ -339,7 +349,7 @@ foldChange.CsparseMatrix <- function(
   p1 <- pseudocount.use / length(cells.1)
   p2 <- pseudocount.use / length(cells.2)
   fold.change <- log(mean.1 + p1, base = base) - log(mean.2 + p2, base = base)
-  fc.results <- as.data.frame(
+  fc.results <- data.frame(
     fold_change = fold.change,
     mean.1 = mean.1,
     mean.2 = mean.2,
