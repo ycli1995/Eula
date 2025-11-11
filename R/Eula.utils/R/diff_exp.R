@@ -66,11 +66,11 @@ differExp.CsparseMatrix <- function(
   )
 
   # Actually perform the DE test
-  de.results <- testDE(
+  testDE(
     object,
     cells.1 = cells.1,
     cells.2 = cells.2,
-    features = rownames(fc.results),
+    fc.results = fc.results,
     test.use = test.use,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
@@ -79,7 +79,6 @@ differExp.CsparseMatrix <- function(
     densify = densify,
     ...
   )
-  cbind(fc.results[rownames(de.results), , drop = FALSE], de.results)
 }
 
 #' @importFrom stats p.adjust
@@ -182,6 +181,7 @@ testDE.CsparseMatrix <- function(
     cells.1,
     cells.2,
     features = NULL,
+    fc.results = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     latent.vars = NULL,
@@ -204,15 +204,23 @@ testDE.CsparseMatrix <- function(
     min.cells.group = min.cells.group
   )
   total.features <- nrow(object)
+  if (!is.null(fc.results)) {
+    checkColumns(fc.results, c("pct.1", "pct.2"))
+    features <- features %||% rownames(fc.results)
+    fc.results <- fc.results[features, , drop = FALSE]
+  }
   features <- features %||% rownames(object)
   if (length(features) == 0) {
     if (test.use == "roc") {
       empty.df <- as.data.frame(matrix(nrow = 0, ncol = 2))
       colnames(empty.df) <- c("AUC", "power")
-      return(empty.df)
+    } else {
+      empty.df <- as.data.frame(matrix(nrow = 0, ncol = 1))
+      colnames(empty.df) <- "p_val"
     }
-    empty.df <- as.data.frame(matrix(nrow = 0, ncol = 1))
-    colnames(empty.df) <- "p_val"
+    if (!is.null(fc.results)) {
+      return(cbind(fc.results[features, , drop = FALSE], empty.df))
+    }
     return(empty.df)
   }
 
@@ -227,10 +235,10 @@ testDE.CsparseMatrix <- function(
       cells.2 <- sample(cells.2, size = max.cells.per.ident)
     }
   }
-  object <- object[features, c(cells.1, cells.2), drop = FALSE]
   if (!is.null(latent.vars)) {
     latent.vars <- latent.vars[c(cells.1, cells.2), , drop = FALSE]
   }
+  object <- object[features, c(cells.1, cells.2), drop = FALSE]
   if (densify) {
     object <- as.matrix(object)
   }
@@ -274,19 +282,33 @@ testDE.CsparseMatrix <- function(
     ),
     stop("Unknown test: ", test.use)
   )
-  if (test.use == "roc") {
-    return(de.results[order(de.results$AUC, decreasing = TRUE), , drop = FALSE])
+  if (!test.use %in% DE.METHODS$nocorrect) {
+    de.results$p_val_adj <- p.adjust(
+      p = de.results$p_val,
+      method = p.adjust.method,
+      n = total.features
+    )
   }
-  de.results <- de.results[order(de.results$p_val), , drop = FALSE]
-  if (test.use %in% DE.METHODS$nocorrect) {
-    return(de.results)
+  if (is.null(fc.results)) {
+    if (test.use == "roc") {
+      return(de.results[order(-de.results$AUC), , drop = FALSE])
+    }
+    return(de.results[order(de.results$p_val), , drop = FALSE])
   }
-  de.results$p_val_adj <- p.adjust(
-    p = de.results$p_val,
-    method = p.adjust.method,
-    n = total.features
+  de.results <- cbind(
+    fc.results[rownames(de.results), , drop = FALSE],
+    de.results
   )
-  de.results
+  p.col <- "p_val"
+  if (test.use == "roc") {
+    p.col <- "AUC"
+  }
+  idx <- order(
+    de.results[[p.col]],
+    -de.results[, 1],
+    -abs(de.results$pct.1 - de.results$pct.2)
+  )
+  de.results[idx, , drop = FALSE]
 }
 
 #' @export
@@ -339,10 +361,10 @@ foldChange.CsparseMatrix <- function(
   if (!is.function(mean.fxn)) {
     stop("'mean.fxn' must be a function.")
   }
-  ncells.1 <- rowSums(object[, cells.1, drop = FALSE] > min.exp)
-  ncells.2 <- rowSums(object[, cells.2, drop = FALSE] > min.exp)
-  pct.1 <- ncells.1 / length(cells.1)
-  pct.2 <- ncells.2 / length(cells.2)
+  ncells.1 <- Matrix::rowSums(object[, cells.1, drop = FALSE] > min.exp)
+  ncells.2 <- Matrix::rowSums(object[, cells.2, drop = FALSE] > min.exp)
+  pct.1 <- round(ncells.1 / length(cells.1), digits = 3)
+  pct.2 <- round(ncells.2 / length(cells.2), digits = 3)
   mean.1 <- mean.fxn(object[, cells.1, drop = FALSE])
   mean.2 <- mean.fxn(object[, cells.2, drop = FALSE])
 

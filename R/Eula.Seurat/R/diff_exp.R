@@ -160,6 +160,7 @@ testDE.Assay <- function(
     cells.2,
     slot = "data",
     features = NULL,
+    fc.results = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     latent.vars = NULL,
@@ -181,6 +182,7 @@ testDE.Assay <- function(
     cells.2 = cells.2,
     test.use = test.use,
     features = features,
+    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
@@ -198,6 +200,7 @@ testDE.DimReduc <- function(
     cells.1,
     cells.2,
     features = NULL,
+    fc.results = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
     latent.vars = NULL,
@@ -212,6 +215,7 @@ testDE.DimReduc <- function(
     cells.2 = cells.2,
     test.use = test.use,
     features = features,
+    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
@@ -231,6 +235,7 @@ testDE.Seurat <- function(
     group.by = NULL,
     slot = "data",
     features = NULL,
+    fc.results = NULL,
     assay = NULL,
     reduction = NULL,
     test.use = "wilcox",
@@ -277,6 +282,7 @@ testDE.Seurat <- function(
     cells.2 = cells$cells.2,
     test.use = test.use,
     features = features,
+    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
@@ -360,12 +366,12 @@ differExp.Assay <- function(
     min.cells.feature = min.cells.feature,
     only.pos = only.pos
   )
-  de.results <- testDE(
+  testDE(
     object,
     cells.1 = cells.1,
     cells.2 = cells.2,
     slot = slot,
-    features = rownames(fc.results),
+    fc.results = fc.results,
     test.use = test.use,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
@@ -374,7 +380,6 @@ differExp.Assay <- function(
     densify = densify,
     ...
   )
-  cbind(fc.results[rownames(de.results), , drop = FALSE], de.results)
 }
 
 #' @export
@@ -442,11 +447,11 @@ differExp.DimReduc <- function(
   )
 
   # Actually perform the DE test
-  de.results <- testDE(
+  testDE(
     data,
     cells.1 = cells.1,
     cells.2 = cells.2,
-    features = rownames(fc.results),
+    fc.results = fc.results,
     test.use = test.use,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
@@ -454,7 +459,6 @@ differExp.DimReduc <- function(
     latent.vars = latent.vars,
     ...
   )
-  cbind(fc.results[rownames(de.results), , drop = FALSE], de.results)
 }
 
 #' @export
@@ -549,12 +553,12 @@ differExp.Seurat <- function(
       cells = c(cells$cells.1, cells$cells.2)
     )
   }
-  de.results <- testDE(
+  testDE(
     object = data.use,
     cells.1 = cells$cells.1,
     cells.2 = cells$cells.2,
     test.use = test.use,
-    features = features,
+    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
@@ -563,7 +567,6 @@ differExp.Seurat <- function(
     densify = densify,
     ...
   )
-  cbind(fc.results[rownames(de.results), , drop = FALSE], de.results)
 }
 
 #' @export
