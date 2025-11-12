@@ -13,12 +13,12 @@ RoxygenNote: 7.3.3
 Imports: 
     circlize,
     dplyr,
+    extrafont,
     ggplot2,
     Matrix,
     qvalue,
     rlang,
     ROCR,
-    showtext,
     vctrs,
     yaml
 Suggests: 

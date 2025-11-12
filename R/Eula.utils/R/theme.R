@@ -32,3 +32,26 @@ dot_theme_default <- function(family = "Arial", ...) {
     theme(text = element_text(family = family))
 }
 
+#' @export
+bar_theme_default <- function(family = "Arial", ...) {
+  options(scipen = -1)
+  theme_bw() +
+    theme(
+      panel.grid = element_blank(),
+      panel.border = element_rect(color = "#000000", size = 0.8, fill = NA),
+
+      axis.text  = element_text(color = "#000000", size = 11),
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+      axis.text.y = element_text(hjust = 1, vjust = 0.5),
+      axis.title = element_text(color = "#000000", size = 14, face = "plain"),
+      axis.title.x = element_text(margin = margin(2.5,0,2.5,0, "mm")),
+      axis.title.y = element_text(margin = margin(0,2.5,0,2.5, "mm")),
+      axis.ticks = element_line(color = "#000000", size = 0.5),
+      axis.ticks.length = unit(0.1, 'cm'),
+
+      legend.title = element_blank(),
+      plot.title = element_text(size = 16, face = "plain", hjust = 0.5),
+      plot.margin = unit(c(10,10,10,10), "mm")
+    ) +
+    theme(text = element_text(family = family))
+}
