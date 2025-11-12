@@ -289,8 +289,24 @@ fetch_color_dataframe <- function(color_table) {
 }
 
 #' @export
-mkdir <- function(path) {
+fetch_default_params <- function(defaults, params = list(), ...) {
+  for (i in names(defaults)) {
+    params[[i]] <- params[[i]] %||% defaults[[i]]
+  }
+  params
+}
+
+#' @export
+capture.msg <- function(...) {
+  capture.output(..., file = stderr())
+}
+
+#' @export
+mkdir <- function(path, chdir = FALSE) {
   dir.create(path, showWarnings = FALSE, recursive = TRUE)
+  if (chdir) {
+    setwd(path)
+  }
 }
 
 # find_group_index <- function(

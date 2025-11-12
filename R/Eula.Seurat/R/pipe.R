@@ -1,3 +1,5 @@
+#' @importFrom Eula.utils capture.msg fetch_default_params
+NULL
 
 #' @export
 pipe_RenameObject <- function(obj, params = list()) {
@@ -29,13 +31,20 @@ pipe_RenameObject <- function(obj, params = list()) {
 
 #' @export
 pipe_ShrinkSeuratObject <- function(obj, params = list(), ...) {
-  params$scale.data <- params$scale.data %||% FALSE
-  params$misc.counts <- params$misc.counts %||% TRUE
-
-  params$assays <- params$assays %||% Assays(obj)
-  params$assays <- intersect(params$assays, Assays(obj))
-
   Message('>>>>> Shrinking Seurat object...')
+
+  defaults <- list(
+    scale.data = FALSE,
+    misc.counts = TRUE,
+    assays = Assays(obj)
+  )
+  params <- fetch_default_params(defaults, params)
+  params$assays <- intersect(params$assays, Assays(obj))
+  params <- params[names(defaults)]
+
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+
   obj <- ShrinkSeuratObject(
     object = obj,
     assays = params$assays,
@@ -47,10 +56,12 @@ pipe_ShrinkSeuratObject <- function(obj, params = list(), ...) {
 
 #' @export
 pipe_SubsetObject <- function(obj, params = list(), ...) {
-  params$cells <- params$cells %||% params$cells_use
-  params$features <- params$features %||% params$features
-
   Message('>>>>> Subset Seurat object...')
+
+  params$cells <- params$cells %||% params$cells_use
+  params$features <- params$features %||% params$features_use
+  capture.msg(str(params))
+
   cells_features <- get_cells_and_features(
     object = obj,
     cells = params$cells,
@@ -71,19 +82,21 @@ pipe_SubsetObject <- function(obj, params = list(), ...) {
 
 #' @export
 pipe_UpdateSeurat <- function(obj, params = list(), ...) {
-  params$Assay5 <- params$Assay5 %||% FALSE
-
   Message('>>>>> Check Seurat version...')
+  params$Assay5 <- params$Assay5 %||% FALSE
+  capture.msg(str(params))
+
   obj <- UpdateSeuratAll(object = obj, Assay5 = params$Assay5)
   obj
 }
 
 #' @export
 pipe_StatFeaturePercentage <- function(obj, params = list(), ...) {
-  stat.pct <- params[['stat.pct']] %||% TRUE
-  params[['stat.pct']] <- NULL
-
   Message('>>>>> Stat features')
+  stat.pct <- params[['stat.pct']] %||% TRUE
+  capture.msg(str(params))
+
+  params[['stat.pct']] <- NULL
   for (i in names(params)) {
     i2 <- gsub("\\/| ", "_", i)
     obj <- StatFeatures(
@@ -131,27 +144,28 @@ pipe_MakeSeuratObj <- function(params) {
 pipe_FindVariableFeatures <- function(obj, params = list(), ...) {
   Message("Runing FindVariableFeatures")
 
-  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  defaults <- list(
+    assay = DefaultAssay(obj),
+    selection.method = "vst",
+    nfeatures = 2000
+  )
+  params <- fetch_default_params(defaults, params)
   params[['vfeatures']] <- norm_list_param(params[['vfeatures']])
+  params[['vfeature.must']] <- norm_list_param(params[['vfeature.must']])
+  params[['vfeature.remove']] <- norm_list_param(params[['vfeature.remove']])
+  capture.msg(str(params))
+
   if (length(params[['vfeatures']]) > 0) {
     Message("Use preset variable features")
-    print(str(params))
     list2env(params, envir = environment())
 
     vfeatures <- getFeaturesID(obj, features = vfeatures)
-    print(str(vfeatures))
     VariableFeatures(obj[[assay]]) <- vfeatures
     return(obj)
   }
 
-  params[['selection.method']] <- params[['selection.method']] %||% "vst"
-  params[['nfeatures']] <- params[['nfeatures']] %||% 2000
-  params[['vfeature.must']] <- norm_list_param(params[['vfeature.must']])
-  params[['vfeature.remove']] <- norm_list_param(params[['vfeature.remove']])
-  print(str(params))
-  list2env(params, envir = environment())
-
   Message("Find variable features")
+  list2env(params, envir = environment())
   obj <- FindVariableFeatures(
     object = obj,
     assay = assay,
@@ -178,12 +192,19 @@ pipe_FindVariableFeatures <- function(obj, params = list(), ...) {
 pipe_CellCycleScoring <- function(obj, params = list(), ...) {
   Message("Runing cell cycle scoring.")
 
-  params[['s.features']] <- norm_list_param(params[['s.features']]) %0%
-    Seurat::cc.genes$s.genes
-  params[['g2m.features']] <- norm_list_param(params[['g2m.features']]) %0%
-    Seurat::cc.genes$g2m.genes
-  params[['s.features']] <- getFeaturesID(obj, params[['s.features']])
-  params[['g2m.features']] <- getFeaturesID(obj, params[['g2m.features']])
+  defaults <- list(
+    s.features = Seurat::cc.genes$s.genes,
+    g2m.features = Seurat::cc.genes$g2m.genes,
+    regress = "diff",
+    assay = DefaultAssay(obj),
+    slot = "data",
+    set.ident = FALSE
+  )
+
+  params[['s.features']] <- norm_list_param(params[['s.features']])
+  params[['g2m.features']] <- norm_list_param(params[['g2m.features']])
+  params <- fetch_default_params(defaults, params)
+  capture.msg(str(params))
 
   if (any(lengths(params[c('s.features', 'g2m.features')]) < 2)) {
     print(str(params))
@@ -191,15 +212,11 @@ pipe_CellCycleScoring <- function(obj, params = list(), ...) {
     return(obj)
   }
 
-  params[['regress']] <- params[['regress']] %||% "diff"
-  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
-  params[['slot']] <- params[['slot']] %0% "data"
-  params[['set.ident']] <- params[['set.ident']] %0% FALSE
-  print(str(params))
+  params[['s.features']] <- getFeaturesID(obj, params[['s.features']])
+  params[['g2m.features']] <- getFeaturesID(obj, params[['g2m.features']])
   list2env(params, envir = environment())
   ctrl <- params[['ctrl']]
-
-  regress <- match.arg(params[['regress']], c("none", "diff", "all"))
+  regress <- match.arg(regress, c("none", "diff", "all"))
 
   obj <- CellCycle(
     object = obj,
@@ -227,10 +244,13 @@ pipe_CellCycleScoring <- function(obj, params = list(), ...) {
 pipe_NormalizeData <- function(obj, params = list(), ...) {
   Message("Runing NormalizeData")
 
-  params[['method']] <- params[['method']] %||% "LogNormalize"
-  params[['scale.factor']] <- params[['scale.factor']] %||% 10000
-  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
-  print(str(params))
+  defaults <- list(
+    method = "LogNormalize",
+    scale.factor = 10000,
+    assay = DefaultAssay(obj)
+  )
+  params <- fetch_default_params(defaults, params)
+  capture.msg(str(params))
 
   list2env(params, envir = environment())
   obj <- NormalizeData(
@@ -249,17 +269,19 @@ pipe_NormalizeData <- function(obj, params = list(), ...) {
 pipe_ScaleData <- function(obj, params = list(), ...) {
   Message("Runing ScaleData.")
 
-  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
+  defaults <- list(
+    assay = DefaultAssay(obj),
+    scale.max = 10,
+    only.var.features = TRUE
+  )
+  params <- fetch_default_params(defaults, params)
   params[['vars.to.regress']] <- params[['vars.to.regress']] %||%
     c(paste0("nCount_", params[['assay']]), "percent.mito")
   params[['vars.to.regress']] <- unique(c(
     params[['vars.to.regress']],
     obj@misc$vars.to.regress
   ))
-  params[['scale.max']] <- params[['scale.max']] %||% 10
-  params[['only.var.features']] <- params[['only.var.features']] %||% TRUE
-
-  print(str(params))
+  capture.msg(str(params))
   list2env(params, envir = environment())
 
   vars.to.regress <- intersect(vars.to.regress, colnames(obj[[]]))
@@ -282,36 +304,35 @@ pipe_ScaleData <- function(obj, params = list(), ...) {
 pipe_RunPCA <- function(obj, params = list(), ...) {
   Message("Runing PCA.")
 
-  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
-  params[['npcs']] <- params[['npcs']] %||% 50
-  params[['rev.pca']] <- params[['rev.pca']] %||% FALSE
-  params[['weight.by.var']] <- params[['weight.by.var']] %||% TRUE
-  params[['seed']] <- params[['seed']] %||% 42
-  params[['approx']] <- params[['approx']] %||% TRUE
-
-  params[['reduction.key']] <- params[['reduction.key']] %||% "PC_"
-  params[['reduction.name']] <- params[['reduction.name']] %||% "pca"
+  defaults <- list(
+    assay = DefaultAssay(obj),
+    npcs = 50,
+    rev.pca = FALSE,
+    weight.by.var = TRUE,
+    seed = 42,
+    approx = TRUE,
+    reduction.key = "PC_",
+    reduction.name = "pca"
+  )
+  params <- fetch_default_params(defaults, params)
   params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
     params[['assay']]
-
-  print(str(params))
+  capture.msg(str(params))
   list2env(params, envir = environment())
 
   obj <- RunPCA(
     object = obj,
     assay = assay,
-    npcs = params[['npcs']],
-    rev.pca = params[['rev.pca']],
-    weight.by.var = params[['weight.by.var']],
+    npcs = npcs,
+    rev.pca = rev.pca,
+    weight.by.var = weight.by.var,
     verbose = FALSE,
     reduction.key = reduction.key,
     reduction.name = reduction.name,
     seed.use = seed,
-    approx = params[['approx']],
+    approx = approx,
     ...
   )
-
-
   obj[[paste0(reduction.name, "_", reduction.surfix)]] <- obj[[reduction.name]]
   obj@misc$reduction <- list(
     RunUMAP = reduction.name,
@@ -332,23 +353,22 @@ pipe_RunTSNE <- function(obj, params = list(), ...) {
   }
 
   Message("Runing tSNE.")
-  params[['reduction']] <- params[['reduction']] %||%
-    obj@misc$reduction[['RunTSNE']]
-  params[['reduction']] <- params[['reduction']] %||% "pca"
-
-  params[['reduction.key']] <- params[['reduction.key']] %||% "tSNE_"
-  params[['seed']] <- params[['seed']] %||% 42
-  params[['dim.embed']] <- params[['dim.embed']] %||% 2
-  params[['num.threads']] <- params[['num.threads']] %||% 1
+  defaults <- list(
+    reduction = obj@misc$reduction[['RunTSNE']] %||% "pca",
+    reduction.key = "tSNE_",
+    seed = 42,
+    dim.embed = 2,
+    num.threads = 1,
+    perplexity = 30,
+    reduction.name = "tsne"
+  )
+  params <- fetch_default_params(defaults, params)
   params[['dims']] <- params[['dims']] %0%
     seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
-
-  params[['perplexity']] <- params[['perplexity']] %||% 30
-  params[['reduction.name']] <- params[['reduction.name']] %||% "tsne"
   params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
     params[['reduction']]
 
-  print(str(params))
+  capture.msg(str(params))
   list2env(params, envir = environment())
   perplexity <- min(perplexity, floor((ncol(obj) - 1)/3))
 
@@ -380,36 +400,34 @@ pipe_RunUMAP <- function(obj, params = list(), ...) {
   }
 
   Message("Runing UMAP.")
-  params[['reduction']] <- params[['reduction']] %||%
-    obj@misc$reduction[['RunUMAP']]
-  params[['reduction']] <- params[['reduction']] %||% "pca"
-
+  defaults <- list(
+    reduction = obj@misc$reduction[['RunUMAP']] %||% "pca",
+    assay = DefaultAssay(obj),
+    reduction.key = "UMAP_",
+    seed = 42,
+    umap.method = "uwot",
+    dim.embed = 2,
+    n.neighbors = 30,
+    metric = "cosine",
+    learning.rate = 1,
+    local.connectivity = 1,
+    min.dist = 0.3,
+    spread = 1,
+    set.op.mix.ratio = 1,
+    reduction.name = "umap"
+  )
+  params <- fetch_default_params(defaults, params)
   params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
     params[['reduction']]
-  params[['reduction.name']] <- params[['reduction.name']] %||% "umap"
-  params[['reduction.key']] <- params[['reduction.key']] %||% "UMAP_"
-  params[['seed']] <- params[['seed']] %||% 42
-  params[['dim.embed']] <- params[['dim.embed']] %||% 2
-  params[['umap.method']] <- params[['umap.method']] %||% "uwot"
-  params[['n.neighbors']] <- params[['n.neighbors']] %||% 30
-  params[['metric']] <- params[['metric']] %||% "cosine"
-  params[['learning.rate']] <- params[['learning.rate']] %||% 1
-  params[['local.connectivity']] <- params[['local.connectivity']] %||% 1
-  params[['min.dist']] <- params[['min.dist']] %||% 0.3
-  params[["spread"]] <- params[["spread"]] %||% 1
-  params[['set.op.mix.ratio']] <- params[['set.op.mix.ratio']] %||% 1
   params[['dims']] <- params[['dims']] %0%
     seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
+  capture.msg(str(params))
 
-  print(str(params))
   list2env(params, envir = environment())
-
   graph <- params[["graph"]]
-  assay <- params[['assay']]
   nn.name <- params[['nn.name']]
   reduction.model <- params[['reduction.model']]
   n.epochs <- params[['n.epochs']]
-
   if (!is.null(nn.name)) {
     dims <- NULL
   }
@@ -452,21 +470,28 @@ pipe_FindClusters <- function(obj, params = list(), ...) {
     return(obj)
   }
 
-  reduction <- params[['reduction']] %||%
-    obj@misc$reduction[['FindNeighbors']]
-  reduction <- reduction %||% "pca"
+  Message("Runing FindClusters.")
+  defaults <- list(
+    reduction = obj@misc$reduction[['FindNeighbors']] %||% "pca",
+    assay = DefaultAssay(obj),
+    k.param = 20,
+    prune.SNN = 1/15,
+    n.trees = 50,
+    l2.norm = FALSE,
+    cluster.name = "seurat_clusters",
+    resolution = 0.5,
+    algorithm = "leiden",
+    seed = 42,
+    group.singletons = TRUE
+  )
+  params <- fetch_default_params(defaults, params)
+  params[['dims']] <- params[['dims']] %0%
+    seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
+  capture.msg(str(params))
 
-  assay <- params[['assay']] %||% DefaultAssay(obj)
-  k.param <- params[['k.param']] %||% 20
-  prune.SNN <- params[['prune.SNN']] %||% 1/15
-  n.trees <- params[['n.trees']] %||% 50
+  list2env(params, envir = environment())
   graph.name <- params[['graph.name']]
-  l2.norm <- params[['l2.norm']] %||% FALSE
 
-  dims <- params[['dims']] %0%
-    seq_len(ncol(Embeddings(obj, reduction = reduction)))
-
-  Message("Runing FindNeighbors.")
   obj <- FindNeighbors(
     object = obj,
     assay = assay,
@@ -480,17 +505,10 @@ pipe_FindClusters <- function(obj, params = list(), ...) {
     l2.norm = l2.norm,
     ...
   )
-
-  cluster.name <- params[['cluster.name']] %||% "seurat_clusters"
-  resolution <- params[['resolution']] %||% 0.5
-  algorithm <- params[['algorithm']] %||% "leiden"
-  seed <- params[['seed']] %||% 42
-  group.singletons <- params[['group.singletons']] %||% TRUE
   if (seed < 1) {
     seed <- 1
   }
 
-  Message("Runing FindClusters.")
   obj <- FindClusters(
     object = obj,
     graph.name = graph.name,
@@ -502,7 +520,7 @@ pipe_FindClusters <- function(obj, params = list(), ...) {
     verbose = TRUE,
     ...
   )
-  print(table(obj[[cluster.name]], useNA = 'ifany'))
+  capture.msg(table(obj[[cluster.name]], useNA = 'ifany'))
 
   obj@misc$colors[[cluster.name]] <- setColors(
     obj[[cluster.name, drop = TRUE]],
@@ -526,39 +544,39 @@ pipe_IntegrateData <- function(obj, params = list(), ...) {
   }
 
   Message('>>>>> Running IntegrateData')
-  params[['split.by']] <- params[['split.by']] %||% "orig.ident"
-  split.by <- params[['split.by']]
-  if (length(unique(obj[[split.by, drop = TRUE]])) == 1) {
-    fastWarning("Only 1 batch. No need for integration.")
-    return(obj)
-  }
-
-  params[['method']] <- params[['method']] %||% "harmony"
-  params[['reduction']] <- params[['reduction']] %||% "pca"
-  params[['assay']] <- params[['assay']] %||% DefaultAssay(obj)
-  assay <- params[['assay']]
-  reduction <- params[['reduction']]
-
-  method <- match.arg(params[['method']], choices = c("harmony", "CCA", "RPCA"))
+  defaults <- list(
+    method = "harmony",
+    reduction = "pca",
+    assay = DefaultAssay(obj),
+    split.by = "orig.ident",
+    theta = 2
+  )
+  params <- fetch_default_params(defaults, params)
+  params[['method']] <- match.arg(
+    params[['method']],
+    choices = c("harmony", "CCA", "RPCA")
+  )
   default.new.reduc <- switch(
-    method,
+    params[['method']],
     harmony = "harmony",
     CCA = "cca.integrated",
     RPCA = "rpca.integrated"
   )
-
   params[['new.reduction']] <- params[['new.reduction']] %||% default.new.reduc
-  new.reduction <- params[['new.reduction']]
 
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+
+  if (length(unique(obj[[split.by, drop = TRUE]])) == 1) {
+    fastWarning("Only 1 batch. No need for integration.")
+    return(obj)
+  }
   obj@misc$reduction <- list(
     RunUMAP = new.reduction,
     RunTSNE = new.reduction,
     FindNeighbors = new.reduction
   )
-
   if (method == "harmony") {
-    params[['theta']] <- params[['theta']] %||% 2
-    print(str(params))
     obj <- RunHarmony(
       object = obj,
       group.by.vars = split.by,
@@ -570,7 +588,6 @@ pipe_IntegrateData <- function(obj, params = list(), ...) {
     )
     return(obj)
   }
-  print(str(params))
   method.f <- switch(
     method,
     CCA = CCAIntegration,
@@ -695,6 +712,7 @@ pipe_RenameObject_R <- function(params = list(), ...) {
 #' @export
 pipe_SeuratClustering_R <- function(params = list(), ...) {
   outdir <- params[['outdir']] %||% getwd()
+  pipe_MultiCore(params)
 
   obj <- pipe_GetSeuratObj(params)
 
@@ -717,30 +735,31 @@ pipe_SeuratClustering_R <- function(params = list(), ...) {
   obj <- pipe_FindClusters(obj, params[['FindClusters']])
 
   outfile <- file.path(outdir, "obj.Rda")
-  mkdir(outdir)
+  mkdir(outdir, chdir = TRUE)
   Message('>>>>> Save object to: ', outfile)
   save(obj, file = outfile)
 
   Message('>>>>> Output some lists: ', outdir)
-  WriteRenameConf(obj, outdir)
+  WriteRenameConf(obj)
 
-  setwd(outdir)
   pipe_PostClustering(obj, params[['PostClustering']])
 
-  obj
+  invisible(obj)
 }
 
 #' @export
 pipe_PostClustering <- function(obj, params = list(), ...) {
   Message('>>>>> Running PostClustering')
-
-  params[['outdir']] <- params[['outdir']] %||% getwd()
-  params[['sample.by']] <- params[['sample.by']] %||% "orig.ident"
-  params[['group.by']] <- params[['group.by']] %||% "Groups"
-  params[['cluster.by']] <- params[['cluster.by']] %||% "seurat_clusters"
-  params[['reductions']] <- params[['reductions']] %||% c("tsne", "umap")
-  params[['corner.axis']] <- params[['corner.axis']] %||% TRUE
-  print(str(params))
+  defaults <- list(
+    outdir = getwd(),
+    sample.by = "orig.ident",
+    group.by = "Groups",
+    cluster.by = "seurat_clusters",
+    reductions = c("tsne", "umap"),
+    corner.axis = TRUE
+  )
+  params <- fetch_default_params(defaults, params)
+  capture.msg(str(params))
   list2env(params, envir = environment())
 
   if (!group.by %in% colnames(obj[[]])) {
@@ -748,7 +767,7 @@ pipe_PostClustering <- function(obj, params = list(), ...) {
     obj@misc$colors[[group.by]] <- obj@misc$colors[[sample.by]]
   }
 
-  Message('>>>>> Plotting DimPlot')
+  Message('Plotting DimPlot')
   save_multi_DimPlot(
     obj,
     outdir = outdir,
@@ -768,19 +787,127 @@ pipe_PostClustering <- function(obj, params = list(), ...) {
     ...
   )
 
-  Message('>>>>> Get average expression')
+  Message('Get average expression')
   out.names <- c(Samples = sample.by, Groups = group.by, Clusters = cluster.by)
   for (i in names(out.names)) {
-    outfile <- paste0("AllGene.", i, ".avg_exp.xls")
+    outfile <- file.path(outdir, paste0("AllGene.", i, ".avg_exp.xls"))
     CalAvgExp(obj, group.by = out.names[i], outfile = outfile)
 
-    outfile <- paste0("AllGene.", i, ".avg_pct.xls")
+    outfile <- file.path(outdir, paste0("AllGene.", i, ".avg_pct.xls"))
     CalAvgPct(obj, group.by = out.names[i], outfile = outfile)
   }
 
-  Message('>>>>> Get clustering results')
+  Message('Get clustering results')
   df <- FetchSeuratData(obj, out.names)
-  writeTable(df, "Cells.cluster.list.xls")
+  writeTable(df, file.path(outdir, "Cells.cluster.list.xls"))
 
   obj
+}
+
+#' @export
+pipe_FindAllMarkers <- function(obj, params = list(), ...) {
+  Message('>>>>> Running FindAllMarkers')
+
+  defaults <- list(
+    outdir = getwd(),
+    assay = DefaultAssay(obj),
+    group.by = "seurat_clusters",
+    slot = 'data',
+    test.use = "wilcox",
+    p.adjust.method = "bonferroni",
+    min.cells.group = 3,
+    max.cells.per.ident = Inf,
+    return.thresh = 1e-2,
+    use.adjust = TRUE,
+    logfc.threshold = 0.25,
+    top.n = 5,
+    min.mean.exp = 0,
+    min.pct = 0.01,
+    min.diff.pct = -Inf,
+    min.cells.feature = 3,
+    only.pos = TRUE,
+    min.exp = 0,
+    pseudocount.use = 1,
+    base = 2,
+    seed = 42
+  )
+  params <- fetch_default_params(defaults, params)
+  params[['features']] <- norm_list_param(params[['features']])
+  params[['features']] <- getFeaturesID(obj, params[['features']])
+
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+  features <- params[['features']]
+  latent.vars <- params[['latent.vars']]
+
+  markers <- findAllMarkers(
+    object = obj,
+    assay = assay,
+    features = features,
+    group.by = group.by,
+    slot = slot,
+
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    latent.vars = latent.vars,
+    min.cells.group = min.cells.group,
+    max.cells.per.ident = max.cells.per.ident,
+    return.thresh = return.thresh,
+    use.adjust = use.adjust,
+
+    logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
+    min.pct = min.pct,
+    min.diff.pct = min.diff.pct,
+    min.cells.feature = min.cells.feature,
+    only.pos = only.pos,
+
+    min.exp = min.exp,
+    pseudocount.use = pseudocount.use,
+    base = base,
+    seed = seed,
+    ...
+  )
+  annot <- GetRowAnnot(obj, markers$gene)
+  markers <- cbind(annot, as.data.frame(markers))
+  markers <- markers %>%
+    dplyr::mutate(Clusters = cluster, .before = 1) %>%
+    select(!c("gene", "cluster")) %>%
+    as.data.frame()
+  save(markers, file = file.path(outdir, "markers.Rda"))
+  writeTable(markers, file.path(outdir, "DeGene.list.xls"))
+
+  StatMarker(markers, colors = obj@misc$colors[[group.by]])
+
+  top <- getTopMarkers(markers, top.n = top.n, group.by = "Clusters")
+  writeTable(top, file.path(outdir, "Top.list.xls"))
+
+  markers
+}
+
+#' @export
+pipe_MultiCore <- function(params = list(), ...) {
+  n.cores <- params[['n.cores']] %||% 1
+
+  require("future", quietly = TRUE)
+  options(future.globals.maxSize = 100 * 1024 * 1024^2)
+  if (n.cores > 1) {
+    Message("Set 'multicore': ", n.cores)
+    plan("multicore", workers = n.cores)
+  }
+  invisible(NULL)
+}
+
+#' @export
+pipe_FindAllMarkers_R <- function(params = list(), ...) {
+  outdir <- params[['outdir']] %||% getwd()
+
+  pipe_MultiCore(params)
+
+  obj <- pipe_GetSeuratObj(params)
+
+  mkdir(outdir, chdir = TRUE)
+  markers <- pipe_FindAllMarkers(obj, params[['FindAllMarkers']])
+
+  invisible(markers)
 }

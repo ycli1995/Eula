@@ -24,6 +24,7 @@ differExp.CsparseMatrix <- function(
     max.cells.per.ident = Inf,
     min.cells.group = 3,
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
@@ -59,6 +60,7 @@ differExp.CsparseMatrix <- function(
   fc.results <- selectDE(
     fc.results = fc.results,
     logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
@@ -93,6 +95,7 @@ differExp.matrix <- function(
     max.cells.per.ident = Inf,
     min.cells.group = 3,
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
@@ -115,6 +118,7 @@ differExp.matrix <- function(
     max.cells.per.ident = max.cells.per.ident,
     min.cells.group = min.cells.group,
     logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
@@ -134,26 +138,30 @@ differExp.matrix <- function(
 selectDE <- function(
     fc.results,
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
-    only.pos = FALSE
+    only.pos = FALSE,
+    verbose = TRUE
 ) {
   if (logfc.threshold < 0) {
     stop("'logfc.threshold' must be >= 0.")
   }
   if (only.pos) {
-    selected <- fc.results[, 1] > logfc.threshold
+    selected <- fc.results[, 1] >= logfc.threshold
   } else {
-    selected <- abs(fc.results[, 1]) > logfc.threshold
+    selected <- abs(fc.results[, 1]) >= logfc.threshold
   }
   ncells.min <- pmax(fc.results$ncells.1, fc.results$ncells.2)
-  alpha.min <- pmax(fc.results$pct.1, fc.results$pct.2)
-  alpha.diff <- alpha.min - pmin(fc.results$pct.1, fc.results$pct.2)
+  pct.max <- pmax(fc.results$pct.1, fc.results$pct.2)
+  pct.diff <- pct.max - pmin(fc.results$pct.1, fc.results$pct.2)
+  mean.max <- pmax(fc.results$mean.1, fc.results$mean.2)
   selected <- selected &
-    (ncells.min > min.cells.feature) &
-    (alpha.min > min.pct) &
-    (alpha.diff > min.diff.pct)
+    (ncells.min >= min.cells.feature) &
+    (pct.max >= min.pct) &
+    (pct.diff >= min.diff.pct) &
+    (mean.max >= min.mean.exp)
 
   features <- rownames(fc.results)[selected]
   if (length(features) == 0) {
@@ -165,6 +173,9 @@ selectDE <- function(
       "logfc.threshold = ", logfc.threshold, "\n ",
       "only.pos = ", only.pos
     )
+  }
+  if (verbose) {
+    message("Select ", length(features), " features")
   }
   fc.results[features, , drop = FALSE]
 }
@@ -443,6 +454,9 @@ differWilcox.CsparseMatrix <- function(
     res <- res[1:(nrow(res)/2), ]
     p_val <- res$pval
     return(data.frame(p_val, row.names = rownames(object)))
+  }
+  if (limma.check) {
+    limma <- TRUE
   }
   if (!limma) {
     p_val <- my.sapply(seq_len(nrow(object)), function(i) {

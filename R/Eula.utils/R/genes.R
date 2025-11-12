@@ -7,6 +7,9 @@ getFeaturesID <- function(object, features, ...) {
 #' @export
 #' @method getFeaturesID data.frame
 getFeaturesID.data.frame <- function(object, features, uniq = FALSE, ...) {
+  if (length(features) == 0) {
+    return(features)
+  }
   cols <- c("id", "name", "unique_name", "merge_name")
   checkColumns(object, cols = cols)
   for (i in cols) {
@@ -58,6 +61,9 @@ getFeaturesName.data.frame <- function(
     uniq = FALSE,
     ...
 ) {
+  if (length(features) == 0) {
+    return(features)
+  }
   cols <- c("id", "name", "unique_name", "merge_name")
   checkColumns(object, cols = cols)
   col <- match.arg(col, choices = cols)

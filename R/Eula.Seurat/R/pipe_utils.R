@@ -26,7 +26,8 @@ CalAvgExp <- function(
     bulk = bulk,
     ...
   )
-  out <- AddRowAnnot(object, out, row.type = row.type)
+  annot <- GetRowAnnot(object, rownames(out))
+  out <- cbind(annot, as.data.frame(out))
   if (is.null(outfile)) {
     return(out)
   }
@@ -63,7 +64,8 @@ CalAvgPct <- function(
     bulk = bulk,
     ...
   )
-  out <- AddRowAnnot(object, out, row.type = row.type)
+  annot <- GetRowAnnot(object, rownames(out))
+  out <- cbind(annot, as.data.frame(out))
   if (is.null(outfile)) {
     return(out)
   }
@@ -71,10 +73,10 @@ CalAvgPct <- function(
 }
 
 #' @export
-AddRowAnnot <- function(object, mat, row.type = "Gene", ...) {
-  gene.ids <- getFeaturesName(object, features = rownames(mat), col = "id")
+GetRowAnnot <- function(object, features, row.type = "Gene", ...) {
+  gene.ids <- getFeaturesName(object, features = features, col = "id")
   gene.names <- getFeaturesName(object, features = gene.ids, col = "name")
   annot <- data.frame(gene.ids, gene.names)
   colnames(annot) <- paste0(row.type, c("ID", "Name"))
-  cbind(annot, as.data.frame(mat))
+  annot
 }

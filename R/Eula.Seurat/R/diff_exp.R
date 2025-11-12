@@ -325,6 +325,7 @@ differExp.Assay <- function(
     min.cells.group = 3,
     max.cells.per.ident = Inf,
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
@@ -361,6 +362,7 @@ differExp.Assay <- function(
   fc.results <- selectDE(
     fc.results = fc.results,
     logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
@@ -394,6 +396,7 @@ differExp.DimReduc <- function(
     min.cells.group = 3,
     max.cells.per.ident = Inf,
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
@@ -440,6 +443,7 @@ differExp.DimReduc <- function(
   fc.results <- selectDE(
     fc.results = fc.results,
     logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
@@ -478,6 +482,7 @@ differExp.Seurat <- function(
     min.cells.group = 3,
     max.cells.per.ident = Inf,
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
@@ -539,6 +544,7 @@ differExp.Seurat <- function(
   fc.results <- selectDE(
     fc.results = fc.results,
     logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
@@ -586,6 +592,7 @@ findAllMarkers <- function(
     use.adjust = TRUE,
 
     logfc.threshold = 0.1,
+    min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
     min.cells.feature = 3,
@@ -632,6 +639,7 @@ findAllMarkers <- function(
           min.cells.group = min.cells.group,
           max.cells.per.ident = max.cells.per.ident,
           logfc.threshold = logfc.threshold,
+          min.mean.exp = min.mean.exp,
           min.pct = min.pct,
           min.diff.pct = min.diff.pct,
           min.cells.feature = min.cells.feature,
@@ -695,6 +703,18 @@ findAllMarkers <- function(
     }
   }
   gde.all
+}
+
+#' @importFrom dplyr arrange desc slice_head starts_with
+#' @export
+getTopMarkers <- function(markers, top.n = 5, group.by = "cluster", ...) {
+  p.cols <- intersect(colnames(markers), c("p_val", "p_val_adj", "AUC"))[1]
+  logfc.col <- grep("^avg_log", colnames(markers), value = TRUE)[1]
+  top <- markers %>%
+    group_by(across(all_of(group.by))) %>%
+    dplyr::arrange(desc(!!logfc.col), !!p.cols) %>%
+    dplyr::slice_head(n = top.n)
+  top
 }
 
 .check_join_layers <- function(object, slot) {
