@@ -369,27 +369,29 @@ foldChange.CsparseMatrix <- function(
     base = 2,
     ...
 ) {
-  if (!is.function(mean.fxn)) {
-    stop("'mean.fxn' must be a function.")
-  }
-  ncells.1 <- Matrix::rowSums(object[, cells.1, drop = FALSE] > min.exp)
-  ncells.2 <- Matrix::rowSums(object[, cells.2, drop = FALSE] > min.exp)
-  pct.1 <- round(ncells.1 / length(cells.1), digits = 3)
-  pct.2 <- round(ncells.2 / length(cells.2), digits = 3)
-  mean.1 <- mean.fxn(object[, cells.1, drop = FALSE])
-  mean.2 <- mean.fxn(object[, cells.2, drop = FALSE])
+  group.by <- c(
+    rep.int("cells.1", length(cells.1)),
+    rep.int("cells.2", length(cells.2))
+  )
+  group.by <- factor(group.by, c("cells.1", "cells.2"))
+  object <- object[, c(cells.1, cells.2), drop = FALSE]
+  out <- rowMeanPct(
+    object = object,
+    group.by = group.by,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp,
+    ...
+  )
+  colnames(out$n.cells) <- c("ncells.1", "ncells.2")
+  colnames(out$avg.pct) <- c("pct.1", "pct.2")
+  colnames(out$avg.exp) <- c("mean.1", "mean.2")
+  out <- out[c("avg.exp", "n.cells", "avg.pct")]
+  out <- as.data.frame(Reduce(cbind, out))
 
   p1 <- pseudocount.use / length(cells.1)
   p2 <- pseudocount.use / length(cells.2)
-  fold.change <- log(mean.1 + p1, base = base) - log(mean.2 + p2, base = base)
   fc.results <- data.frame(
-    fold_change = fold.change,
-    mean.1 = mean.1,
-    mean.2 = mean.2,
-    ncells.1 = ncells.1,
-    ncells.2 = ncells.2,
-    pct.1 = pct.1,
-    pct.2 = pct.2,
+    fc = log(out$mean.1 + p1, base = base) - log(out$mean.2 + p2, base = base),
     row.names = rownames(object)
   )
   if (base == exp(1)) {
@@ -397,7 +399,7 @@ foldChange.CsparseMatrix <- function(
   }
   fc.name <- paste0("avg_log", base, "FC")
   colnames(fc.results)[1] <- fc.name
-  fc.results
+  cbind(fc.results, out)
 }
 
 #' @export
@@ -439,15 +441,17 @@ differWilcox.CsparseMatrix <- function(
     limma = FALSE,
     ...
 ) {
-  my.sapply <- .get_sapply()
   presto.check <- requireNamespace("presto", quietly = TRUE)
   limma.check <- requireNamespace("limma", quietly = TRUE)
-
+  my.sapply <- .get_sapply()
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
   group.info <- data.frame(row.names = c(cells.1, cells.2))
   group.info[cells.1, "group"] <- "Group1"
   group.info[cells.2, "group"] <- "Group2"
   group.info[, "group"] <- factor(group.info[, "group"])
-  object <- object[, rownames(group.info), drop = FALSE]
+  group.info <- group.info[colnames(object), , drop = FALSE]
 
   if (presto.check[1] && (!limma)) {
     res <- presto::wilcoxauc(X = object, y = group.info[, "group"])
@@ -513,10 +517,12 @@ differTTest <- function(object, ...) {
 #' @export
 #' @method differWilcox CsparseMatrix
 differTTest.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
+  object.1 <- object[, cells.1, drop = FALSE]
+  object.2 <- object[, cells.2, drop = FALSE]
   my.sapply <- .get_sapply()
   p_val <- my.sapply(
     seq_len(nrow(object)),
-    function(i) t.test(object[i, cells.1], object[i, cells.2], ...)$p.value
+    function(i) t.test(object.1[i, ], object.2[i, ], ...)$p.value
   )
   data.frame(unlist(p_val), row.names = rownames(object))
 }
@@ -548,6 +554,10 @@ differMAST.matrix <- function(
   if (!requireNamespace("MAST", quietly = TRUE)) {
     stop("Please install MAST - learn more at https://github.com/RGLab/MAST")
   }
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
+
   group.info <- data.frame(row.names = c(cells.1, cells.2))
   latent.vars <- latent.vars %||% group.info
   group.info[cells.1, "condition"] <- "Group1"
@@ -563,7 +573,7 @@ differMAST.matrix <- function(
   sca <- MAST::FromMatrix(
     exprsArray = object,
     check_sanity = FALSE,
-    cData = latent.vars,
+    cData = latent.vars[colnames(object), , drop = FALSE],
     fData = fdat
   )
   SummarizedExperiment::colData(sca)$condition <- relevel(
@@ -588,6 +598,9 @@ differMAST.CsparseMatrix <- function(
     latent.vars = NULL,
     ...
 ) {
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
   differMAST(
     object = as.matrix(object),
     cells.1 = cells.1,
@@ -606,13 +619,19 @@ differROC <- function(object, ...) {
 #' @export
 #' @method differROC CsparseMatrix
 differROC.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
-  my.lapply <- .get_lapply()
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
+  group.info <- data.frame(row.names = c(cells.1, cells.2))
+  group.info[cells.1, "group"] <- 1
+  group.info[cells.2, "group"] <- 0
+  group.info <- group.info[colnames(object), , drop = FALSE]
 
-  object <- object[, c(cells.1, cells.2), drop = FALSE]
+  my.lapply <- .get_lapply()
   myAUC <- unlist(my.lapply(rownames(object), function(g) {
     prediction.use <- prediction(
       predictions = object[g, ],
-      labels = c(rep(1, length(cells.1)), rep(0, length(cells.2))),
+      labels = group.info[, "group"],
       label.ordering = 0:1
     )
     perf.use <- performance(prediction.obj = prediction.use, measure = "auc")
@@ -649,11 +668,16 @@ differDESeq2.matrix <- function(object, cells.1, cells.2, ...) {
       "https://bioconductor.org/packages/release/bioc/html/DESeq2.html"
     )
   }
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
   group.info <- data.frame(row.names = c(cells.1, cells.2))
   group.info[cells.1, "group"] <- "Group1"
   group.info[cells.2, "group"] <- "Group2"
   group.info[, "group"] <- factor(group.info[, "group"])
   group.info$wellKey <- rownames(group.info)
+  group.info <- group.info[colnames(object), , drop = FALSE]
+
   dds1 <- DESeq2::DESeqDataSetFromMatrix(
     countData = object,
     colData = group.info,
@@ -674,6 +698,9 @@ differDESeq2.matrix <- function(object, cells.1, cells.2, ...) {
 #' @export
 #' @method differDESeq2 CsparseMatrix
 differDESeq2.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
   differDESeq2.matrix(
     object = as.matrix(object),
     cells.1 = cells.1,
