@@ -369,15 +369,20 @@ foldChange.CsparseMatrix <- function(
     base = 2,
     ...
 ) {
-  group.by <- c(
-    rep.int("cells.1", length(cells.1)),
-    rep.int("cells.2", length(cells.2))
+  group.info <- data.frame(
+    group = c(
+      rep.int("cells.1", length(cells.1)),
+      rep.int("cells.2", length(cells.2))
+    ),
+    row.names = c(cells.1, cells.2)
   )
-  group.by <- factor(group.by, c("cells.1", "cells.2"))
-  object <- object[, c(cells.1, cells.2), drop = FALSE]
+  if (!setequal(c(cells.1, cells.2), colnames(object))) {
+    object <- object[, c(cells.1, cells.2), drop = FALSE]
+  }
+  group.info <- group.info[colnames(object), , drop = FALSE]
   out <- rowMeanPct(
     object = object,
-    group.by = group.by,
+    group.by = group.info[, "group"],
     mean.fxn = mean.fxn,
     min.exp = min.exp,
     ...
