@@ -1,3 +1,5 @@
+#' @importFrom Eula.utils ggsave2
+NULL
 
 #' @importFrom SeuratObject Reductions
 #' @export

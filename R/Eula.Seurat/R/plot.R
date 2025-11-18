@@ -230,6 +230,296 @@ dim_plot.Seurat <- function(
   )
 }
 
+#' @export dot_plot
+dot_plot <- function(object, ...) {
+  UseMethod("dot_plot", object)
+}
+
+#' @importFrom ggplot2 facet_grid
+#' @importFrom Eula.utils bar_theme_default single_dot_plot
+#' @export
+#' @method dot_plot CsparseMatrix
+dot_plot.CsparseMatrix <- function(
+    object,
+    group.by,
+    split.by = NULL,
+    split.features = NULL,
+    mean.fxn = NULL,
+    min.exp = 0,
+    scale = TRUE,
+    colors = NULL,
+    color.limits = c(-2.5, 2.5),
+    size.limits = c(0, 100),
+    coord.flip = FALSE,
+    theme = NULL,
+    ...
+) {
+  mean.fxn <- mean.fxn %||% function(x) rowExpMean(x, log = TRUE)
+  group.by <- as.factor(group.by)
+  if (length(split.by) > 0) {
+    if (length(split.by) != ncol(object)) {
+      stop("'split.by' must have the same length as 'ncol(object)'.")
+    }
+    id <- droplevels(pasteFactors(group.by, split.by))
+  } else {
+    id <- group.by
+    split.by <- NA
+  }
+  out <- rowMeanPct(
+    object = object,
+    group.by = id,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp
+  )
+  group.data <- data.frame(
+    id = id,
+    group = group.by,
+    split = split.by
+  ) %>%
+    group_by(id) %>%
+    summarize(group = unique(group), split = unique(split))
+  group.by <- setNames(group.data$group, levels(id))
+  split.by <- setNames(group.data$split, levels(id))
+  df <- .get_dot_plot_data(
+    out$avg.exp,
+    out$avg.pct,
+    group.by = group.by,
+    split.by = split.by,
+    split.features = split.features
+  )
+  df$x <- df$group.by
+  df$y <- df$features
+  if (coord.flip) {
+    df$x <- df$features
+    df$y <- df$group.by
+  }
+  if (scale) {
+    df$colour <- df$avg.scale.exp
+  } else {
+    df$colour <- df$avg.exp
+  }
+  if (length(color.limits) == 2) {
+    df$colour <- min_max_cut(df$colour, limits = color.limits)
+  }
+  df$size <- df$avg.pct * 100
+  labs.args <- list(
+    x = "",
+    y = "",
+    size = "Expressed percentage",
+    color = "Average Expression"
+  )
+  theme <- theme %||% bar_theme_default()
+  p <- single_dot_plot(
+    data = df,
+    colors = colors,
+    color.limits = color.limits,
+    size.limits = size.limits,
+    theme = theme,
+    facet.args = list(),
+    labs.args = labs.args,
+    ...
+  )
+  if (coord.flip) {
+    p <- p + theme(legend.box = "horizontal")
+  }
+  if (length(split.features) > 0 & length(split.by) > 0) {
+    if (coord.flip) {
+      return(p + facet_grid(split.by ~ split.features, scales = "free"))
+    }
+    return(p + facet_grid(split.features ~ split.by, scales = "free"))
+  }
+  if (length(split.features) > 0) {
+    facet.layer <- if (coord.flip) {
+      facet_wrap(
+        "~split.features",
+        nrow = 1,
+        scales = "free_x",
+        strip.position = "top"
+      )
+    } else {
+      facet_wrap(
+        "~split.features",
+        ncol = 1,
+        scales = "free_y",
+        strip.position = "right"
+      )
+    }
+    return(p + facet.layer)
+  }
+  if (length(split.by) > 0) {
+    facet.layer <- if (coord.flip) {
+      facet_wrap(
+        "~split.by",
+        ncol = 1,
+        scales = "free_y",
+        strip.position = "right"
+      )
+    } else {
+      facet_wrap(
+        "~split.by",
+        nrow = 1,
+        scales = "free_x",
+        strip.position = "top"
+      )
+    }
+    return(p + facet.layer)
+  }
+  p
+}
+
+#' @export
+#' @method dot_plot Seurat
+dot_plot.Seurat <- function(
+    object,
+    features,
+    assay = NULL,
+    cells = NULL,
+    group.by = NULL,
+    split.by = NULL,
+    mean.fxn = NULL,
+    min.exp = 0,
+    scale = TRUE,
+    split.features = NULL,
+    colors = NULL,
+    color.limits = c(-2.5, 2.5),
+    size.limits = c(0, 100),
+    coord.flip = FALSE,
+    theme = NULL,
+    ...
+) {
+  assay <- assay %||% DefaultAssay(object)
+  DefaultAssay(object) <- assay
+
+  orig.groups <- group.by
+  group.by <- group.by %||% "ident"
+  group.data <- FetchData(
+    object,
+    vars = group.by,
+    cells = cells,
+    clean = "project"
+  )
+  group.data$group.by <- as.factor(group.data[, 1])
+
+  if (length(split.by) > 0) {
+    split.data <- FetchData(
+      object,
+      vars = split.by,
+      cells = cells,
+      clean = "project"
+    )
+    group.data$split.by <- as.factor(split.data[, 1])
+  }
+
+  data <- GetAssayData(object)[features, , drop = FALSE]
+  if (!setequal(rownames(group.data), colnames(data))) {
+    data <- data[, rownames(group.data), drop = FALSE]
+  }
+  if (!all(rownames(data) == features)) {
+    data <- data[features, , drop = FALSE]
+  }
+  group.data <- group.data[colnames(data), , drop = FALSE]
+
+  dot_plot(
+    object = data,
+    group.by = group.data$group.by,
+    split.by = group.data$split.by,
+    split.features = split.features,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp,
+    scale = scale,
+    colors = colors,
+    color.limits = color.limits,
+    size.limits = size.limits,
+    coord.flip = coord.flip,
+    theme = theme,
+    ...
+  )
+}
+
+#' @importFrom reshape2 melt
+#' @importFrom dplyr left_join
+.get_dot_plot_data <- function(
+    avg.exp,
+    avg.pct,
+    group.by = NULL,
+    split.by = NULL,
+    split.features = NULL,
+    ...
+) {
+  features <- rownames(avg.exp)
+  clusters <- colnames(avg.pct)
+
+  group.by <- group.by %||% clusters
+  if (length(group.by) > 0) {
+    if (length(group.by) != ncol(avg.exp)) {
+      stop("'group.by' must have the same length as 'ncol(avg.exp)'.")
+    }
+    group.by <- as.factor(group.by)
+    names(group.by) <- clusters
+  }
+  if (length(split.by) > 0) {
+    if (length(split.by) != ncol(avg.exp)) {
+      stop("'split.by' must have the same length as 'ncol(avg.exp)'.")
+    }
+    split.by <- as.factor(split.by)
+    names(split.by) <- clusters
+  }
+  if (length(split.features) > 0) {
+    if (length(split.features) != nrow(avg.exp)) {
+      stop("'split.features' must have the same length as 'nrow(avg.exp)'.")
+    }
+    split.features <- as.factor(split.features)
+    names(split.features) <- features
+  }
+
+  avg.scale.exp <- t(scale(t(avg.exp)))
+  avg.exp <- cbind(
+    features = features,
+    as.data.frame(avg.exp, check.names = FALSE)
+  )
+  avg.pct <- cbind(
+    features = features,
+    as.data.frame(avg.pct, check.names = FALSE)
+  )
+  avg.scale.exp <- cbind(
+    features = features,
+    as.data.frame(avg.scale.exp, check.names = FALSE)
+  )
+  id.vars <- "features"
+  variable.name <- "id"
+  avg.exp <- melt(
+    avg.exp,
+    id.vars = id.vars,
+    variable.name = variable.name,
+    value.name = "avg.exp"
+  )
+  avg.pct <- melt(
+    avg.pct,
+    id.vars = id.vars,
+    variable.name = variable.name,
+    value.name = "avg.pct"
+  )
+  avg.scale.exp <- melt(
+    avg.scale.exp,
+    id.vars = id.vars,
+    variable.name = variable.name,
+    value.name = "avg.scale.exp"
+  )
+  df <- Reduce(dplyr::left_join, list(avg.exp, avg.scale.exp, avg.pct))
+  df$features <- factor(df$features, features)
+
+  if (length(group.by) > 0) {
+    df$group.by <- group.by[df$id]
+  }
+  if (length(split.by) > 0) {
+    df$split.by <- split.by[df$id]
+  }
+  if (length(split.features) > 0) {
+    df$split.features <- split.features[df$features]
+  }
+  df
+}
+
 #' @importFrom ggplot2 element_blank element_text theme
 #' @export
 theme_facet <- function(...) {

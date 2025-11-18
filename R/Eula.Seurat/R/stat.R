@@ -51,7 +51,7 @@ StatMarker <- function(markers, colors = NULL, outpfx = "DeGene.stat", ...) {
   }
   h <- 5
   w <- nrow(stat) * 0.4 + 1.2
-  ggsave(p, file = paste0(outpfx, ".pdf"), height = h, width = w)
+  ggsave2(p, file = paste0(outpfx, ".pdf"), height = h, width = w)
 
   invisible(stat)
 }

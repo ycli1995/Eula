@@ -68,7 +68,7 @@ single_violin_plot <- function(
   p
 }
 
-#' @importFrom ggplot2 scale_size
+#' @importFrom ggplot2 guide_colorbar guide_legend guides scale_size
 #' @export
 single_dot_plot <- function(
     data,
@@ -91,7 +91,11 @@ single_dot_plot <- function(
   p <- ggplot(data) +
     geom_point(mapping = mapping, ...) +
     scale_color_gradientn(colors = colors, limits = color.limits) +
-    scale_size(limits = size.limits)
+    scale_size(limits = size.limits) +
+    guides(
+      size = guide_legend(order = 1),
+      colour = guide_colorbar(order = 2)
+    )
   p <- .add_my_facet_split(p = p, args = facet.args)
   p <- add_my_labs(p, args = labs.args)
   p <- add_my_theme(p, args = theme)

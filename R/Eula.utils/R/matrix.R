@@ -17,9 +17,13 @@ min_max <- function(x) {
 }
 
 #' @export
-min_max_cut <- function(x, min, max) {
-  x[x > max] <- max
-  x[x < min] <- min
+min_max_cut <- function(x, limits = NULL) {
+  if (length(limits) != 2) {
+    fastWarning("'limits' should be a 2-element numeric vector.")
+    return(x)
+  }
+  x[x > limits[2]] <- limits[2]
+  x[x < limits[1]] <- limits[1]
   x
 }
 

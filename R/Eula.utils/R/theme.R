@@ -57,9 +57,19 @@ bar_theme_default <- function(family = "Arial", ...) {
       axis.ticks = element_line(color = "#000000", linewidth = 0.5),
       axis.ticks.length = unit(0.1, 'cm'),
 
-      legend.title = element_blank(),
       plot.title = element_text(size = 16, face = "plain", hjust = 0.5),
       plot.margin = unit(c(10,10,10,10), "mm")
     ) +
     theme(text = element_text(family = family))
+}
+
+#' @importFrom ggplot2 get_last_plot ggsave
+#' @importFrom grDevices cairo_pdf
+#' @export
+ggsave2 <- function(filename, plot = get_last_plot(), device = NULL, ...) {
+  ext <- tools::file_ext(filename)
+  if (tolower(ext) == "pdf") {
+    device <- device %||% cairo_pdf
+  }
+  ggsave(filename = filename, plot = plot, device = device, ...)
 }
