@@ -128,7 +128,7 @@ foldChange.Seurat <- function(
     stop("Please provide 'ident'.")
   }
   if (length(as.vector(ident)) > 1 && any(as.character(ident) %in% cells)) {
-    bad.cells <- setdiff(cells, ident)
+    bad.cells <- setdiff(ident, cells)
     if (length(bad.cells) > 0) {
       stop(
         "The following cells provided to 'ident' are not present:\n ",

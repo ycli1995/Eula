@@ -36,33 +36,27 @@ rowMeanPct <- function(object, ...) {
 #' @method rowMeanPct CsparseMatrix
 rowMeanPct.CsparseMatrix <- function(
     object,
-    group.by,
+    cell.groups,
     mean.fxn = rowExpMean,
     min.exp = 0,
     ...
 ) {
-  if (length(group.by) != ncol(object)) {
-    stop(
-      "Length of 'group.by' (", length(group.by), ") is not equal to ",
-      "'ncol(object)' (", ncol(object), ")"
-    )
+  if (!is.list(cell.groups)) {
+    stop("'cell.groups' must be a list containing cells for each group.")
   }
   if (!is.function(mean.fxn)) {
     stop("'mean.fxn' must be a function.")
   }
-  group.by <- as.factor(group.by)
-  group.by <- droplevels(group.by)
-  all.groups <- levels(group.by)
+  all.groups <- names(cell.groups)
   all.features <- rownames(object)
-
   n.cells <- avg.exp <- avg.pct <- matrix(
     data = 0,
     nrow = nrow(object),
-    ncol = length(all.groups),
+    ncol = length(cell.groups),
     dimnames = list(all.features, all.groups)
   )
-  for (i in all.groups) {
-    cells <- which(group.by == i)
+  for (i in seq_along(cell.groups)) {
+    cells <- cell.groups[[i]]
     n.cells[, i] <- Matrix::rowSums(object[, cells, drop = FALSE] > min.exp)
     avg.pct[, i] <- round(n.cells[, i] / length(cells), digits = 3)
     avg.exp[, i] <- mean.fxn(object[, cells, drop = FALSE])

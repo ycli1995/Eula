@@ -369,35 +369,26 @@ foldChange.CsparseMatrix <- function(
     base = 2,
     ...
 ) {
-  if (!is.function(mean.fxn)) {
-    stop("'mean.fxn' must be a function.")
-  }
-  ncells.1 <- Matrix::rowSums(object[, cells.1, drop = FALSE] > min.exp)
-  ncells.2 <- Matrix::rowSums(object[, cells.2, drop = FALSE] > min.exp)
-  pct.1 <- round(ncells.1 / length(cells.1), digits = 3)
-  pct.2 <- round(ncells.2 / length(cells.2), digits = 3)
-  mean.1 <- mean.fxn(object[, cells.1, drop = FALSE])
-  mean.2 <- mean.fxn(object[, cells.2, drop = FALSE])
-
+  out <- rowMeanPct(
+    object = object,
+    cell.groups = list(cells.1 = cells.1, cells.2 = cells.2),
+    mean.fxn = mean.fxn,
+    min.exp = min.exp
+  )
+  colnames(out$n.cells) <- c("ncells.1", "ncells.2")
+  colnames(out$avg.pct) <- c("pct.1", "pct.2")
+  colnames(out$avg.exp) <- c("mean.1", "mean.2")
   p1 <- pseudocount.use / length(cells.1)
   p2 <- pseudocount.use / length(cells.2)
-  fold.change <- log(mean.1 + p1, base = base) - log(mean.2 + p2, base = base)
-  fc.results <- data.frame(
-    fold_change = fold.change,
-    mean.1 = mean.1,
-    mean.2 = mean.2,
-    ncells.1 = ncells.1,
-    ncells.2 = ncells.2,
-    pct.1 = pct.1,
-    pct.2 = pct.2,
-    row.names = rownames(object)
-  )
+  fold.change <- log(out$avg.exp[, 1] + p1, base) -
+    log(out$avg.exp[, 2] + p2, base)
+  fc.results <- cbind(fold.change, out$avg.exp, out$n.cells, out$avg.pct)
   if (base == exp(1)) {
     base <- ""
   }
   fc.name <- paste0("avg_log", base, "FC")
   colnames(fc.results)[1] <- fc.name
-  fc.results
+  as.data.frame(fc.results)
 }
 
 #' @export

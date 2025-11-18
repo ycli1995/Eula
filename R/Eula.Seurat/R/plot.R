@@ -265,9 +265,10 @@ dot_plot.CsparseMatrix <- function(
     id <- group.by
     split.by <- NA
   }
+  cell.groups <- split(colnames(object), f = id)
   out <- rowMeanPct(
     object = object,
-    group.by = id,
+    cell.groups = cell.groups,
     mean.fxn = mean.fxn,
     min.exp = min.exp
   )
