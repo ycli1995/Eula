@@ -19,8 +19,12 @@ differExp.CsparseMatrix <- function(
     object,
     cells.1,
     cells.2,
+    fc.data = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
+    filter.nosig = TRUE,
     max.cells.per.ident = Inf,
     min.cells.group = 3,
     logfc.threshold = 0.1,
@@ -48,8 +52,12 @@ differExp.CsparseMatrix <- function(
     min.diff.pct <- -Inf
     logfc.threshold <- 0
   }
+  fc.data <- fc.data %||% object
+  if (!setequal(rownames(fc.data), rownames(object))) {
+    stop("'fc.data' must contain the same row names as 'object'")
+  }
   fc.results <- foldChange(
-    object,
+    object = fc.data,
     cells.1 = cells.1,
     cells.2 = cells.2,
     mean.fxn = mean.fxn,
@@ -57,7 +65,7 @@ differExp.CsparseMatrix <- function(
     pseudocount.use = pseudocount.use,
     base = base
   )
-  fc.results <- selectDE(
+  fc.results2 <- selectDE(
     fc.results = fc.results,
     logfc.threshold = logfc.threshold,
     min.mean.exp = min.mean.exp,
@@ -68,19 +76,48 @@ differExp.CsparseMatrix <- function(
   )
 
   # Actually perform the DE test
-  testDE(
+  de.results <- testDE(
     object,
     cells.1 = cells.1,
     cells.2 = cells.2,
-    fc.results = fc.results,
+    features = rownames(fc.results2),
     test.use = test.use,
     p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
     latent.vars = latent.vars,
     densify = densify,
     ...
   )
+  de.results <- cbind(
+    fc.results[rownames(de.results), , drop = FALSE],
+    de.results
+  )
+  de.results$significance <- ifelse(
+    de.results$significance == "sig" & de.results[[1]] > 0,
+    yes = "up",
+    no = de.results$significance
+  )
+  de.results$significance <- ifelse(
+    de.results$significance == "sig" & de.results[[1]] < 0,
+    yes = "down",
+    no = de.results$significance
+  )
+  if (filter.nosig) {
+    de.results <- de.results[de.results$significance != "nosig", , drop = FALSE]
+  }
+  if (nrow(de.results) == 0) {
+    fastWarning("No DE features detected.")
+    return(de.results)
+  }
+  if (test.use == "roc") {
+    idx <- order(-de.results$power, -de.results[[1]])
+  } else {
+    idx <- order(de.results$p_val, -abs(de.results$pct.1 - de.results$pct.2))
+  }
+  de.results[idx, , drop = FALSE]
 }
 
 #' @importFrom stats p.adjust
@@ -90,8 +127,12 @@ differExp.matrix <- function(
     object,
     cells.1,
     cells.2,
+    fc.data = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
+    filter.nosig = TRUE,
     max.cells.per.ident = Inf,
     min.cells.group = 3,
     logfc.threshold = 0.1,
@@ -106,15 +147,18 @@ differExp.matrix <- function(
     base = 2,
     seed = 42,
     latent.vars = NULL,
-    densify = FALSE,
     ...
 ) {
   differExp.CsparseMatrix(
     object = object,
     cells.1 = cells.1,
     cells.2 = cells.2,
+    fc.data = fc.data,
     test.use = test.use,
     p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
+    filter.nosig = filter.nosig,
     max.cells.per.ident = max.cells.per.ident,
     min.cells.group = min.cells.group,
     logfc.threshold = logfc.threshold,
@@ -129,7 +173,6 @@ differExp.matrix <- function(
     base = base,
     seed = seed,
     latent.vars = latent.vars,
-    densify = FALSE,
     ...
   )
 }
@@ -192,9 +235,10 @@ testDE.CsparseMatrix <- function(
     cells.1,
     cells.2,
     features = NULL,
-    fc.results = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
@@ -214,25 +258,20 @@ testDE.CsparseMatrix <- function(
     cells.2 = cells.2,
     min.cells.group = min.cells.group
   )
-  total.features <- nrow(object)
-  if (!is.null(fc.results)) {
-    checkColumns(fc.results, c("pct.1", "pct.2"))
-    features <- features %||% rownames(fc.results)
-    fc.results <- fc.results[features, , drop = FALSE]
+  de.results0 <- data.frame(row.names = rownames(object))
+  if (test.use == "roc") {
+    de.results0$AUC <- 0.5
+    de.results0$power <- 0
+  } else {
+    de.results0$p_val <- 1
+    if (!test.use %in% DE.METHODS$nocorrect) {
+      de.results0$p_val_adj <- 1
+    }
   }
   features <- features %||% rownames(object)
   if (length(features) == 0) {
-    if (test.use == "roc") {
-      empty.df <- as.data.frame(matrix(nrow = 0, ncol = 2))
-      colnames(empty.df) <- c("AUC", "power")
-    } else {
-      empty.df <- as.data.frame(matrix(nrow = 0, ncol = 1))
-      colnames(empty.df) <- "p_val"
-    }
-    if (!is.null(fc.results)) {
-      return(cbind(fc.results[features, , drop = FALSE], empty.df))
-    }
-    return(empty.df)
+    de.results0$significance <- "nosig"
+    return(de.results0)
   }
 
   # subsample cell groups if they are too large
@@ -293,33 +332,31 @@ testDE.CsparseMatrix <- function(
     ),
     stop("Unknown test: ", test.use)
   )
-  if (!test.use %in% DE.METHODS$nocorrect) {
-    de.results$p_val_adj <- p.adjust(
-      p = de.results$p_val,
-      method = p.adjust.method,
-      n = total.features
-    )
-  }
-  if (is.null(fc.results)) {
-    if (test.use == "roc") {
-      return(de.results[order(-de.results$AUC), , drop = FALSE])
-    }
-    return(de.results[order(de.results$p_val), , drop = FALSE])
-  }
-  de.results <- cbind(
-    fc.results[rownames(de.results), , drop = FALSE],
-    de.results
-  )
-  p.col <- "p_val"
+  de.results0[rownames(de.results), colnames(de.results)] <- de.results
   if (test.use == "roc") {
-    p.col <- "AUC"
+    de.results0$significance <- ifelse(
+      de.results0$AUC > 0.7 | de.results0$AUC < 0.3,
+      yes = "sig",
+      no = "nosig"
+    )
+    return(de.results0)
   }
-  idx <- order(
-    de.results[[p.col]],
-    -de.results[, 1],
-    -abs(de.results$pct.1 - de.results$pct.2)
+  p.col <- "p_val"
+  if (!test.use %in% DE.METHODS$nocorrect) {
+    de.results0$p_val_adj <- p.adjust(
+      p = de.results0$p_val,
+      method = p.adjust.method
+    )
+    if (use.adjust) {
+      p.col <- "p_val_adj"
+    }
+  }
+  de.results0$significance <- ifelse(
+    de.results0[[p.col]] < p.thresh,
+    "sig",
+    "nosig"
   )
-  de.results[idx, , drop = FALSE]
+  de.results0
 }
 
 #' @export
@@ -331,6 +368,8 @@ testDE.matrix <- function(
     features = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
     latent.vars = NULL,
     max.cells.per.ident = Inf,
     seed = 42,
@@ -343,10 +382,11 @@ testDE.matrix <- function(
     features = features,
     test.use = test.use,
     p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
     latent.vars = latent.vars,
     max.cells.per.ident = max.cells.per.ident,
     seed = seed,
-    densify = FALSE,
     ...
   )
 }
@@ -380,13 +420,17 @@ foldChange.CsparseMatrix <- function(
   colnames(out$avg.exp) <- c("mean.1", "mean.2")
   p1 <- pseudocount.use / length(cells.1)
   p2 <- pseudocount.use / length(cells.2)
-  fold.change <- log(out$avg.exp[, 1] + p1, base) -
-    log(out$avg.exp[, 2] + p2, base)
-  fc.results <- cbind(fold.change, out$avg.exp, out$n.cells, out$avg.pct)
-  if (base == exp(1)) {
-    base <- ""
+  if (base > 0) {
+    fc <- log(out$avg.exp[, 1] + p1, base) - log(out$avg.exp[, 2] + p2, base)
+    if (base == exp(1)) {
+      base <- ""
+    }
+    fc.name <- paste0("avg_log", base, "FC")
+  } else {
+    fc <- (out$avg.exp[, 1] + p1) - (out$avg.exp[, 2] + p2)
+    fc.name <- "avg_diff"
   }
-  fc.name <- paste0("avg_log", base, "FC")
+  fc.results <- cbind(fc, out$avg.exp, out$n.cells, out$avg.pct)
   colnames(fc.results)[1] <- fc.name
   as.data.frame(fc.results)
 }

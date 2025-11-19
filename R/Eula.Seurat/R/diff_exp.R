@@ -90,9 +90,7 @@ foldChange.Seurat <- function(
   if (!is.null(assay) && !is.null(reduction)) {
     stop("Please only specify either assay or reduction.")
   }
-  if (!is.null(group.by)) {
-    Idents(object) <- group.by
-  }
+  object <- .check_group_by(object, group.by = group.by)
   # select which data to use
   if (is.null(reduction)) {
     assay <- assay %||% DefaultAssay(object)
@@ -150,7 +148,6 @@ foldChange.Seurat <- function(
   list(cells.1 = cells.1, cells.2 = cells.2)
 }
 
-
 #' @importFrom Eula.utils testDE
 #' @export
 #' @method testDE Assay
@@ -160,9 +157,10 @@ testDE.Assay <- function(
     cells.2,
     slot = "data",
     features = NULL,
-    fc.results = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
@@ -182,8 +180,9 @@ testDE.Assay <- function(
     cells.2 = cells.2,
     test.use = test.use,
     features = features,
-    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
     seed = seed,
@@ -193,6 +192,11 @@ testDE.Assay <- function(
   )
 }
 
+#' @importFrom Eula.utils selectDE
+#' @export
+#' @method testDE StdAssay
+testDE.StdAssay <- testDE.Assay
+
 #' @export
 #' @method testDE DimReduc
 testDE.DimReduc <- function(
@@ -200,9 +204,10 @@ testDE.DimReduc <- function(
     cells.1,
     cells.2,
     features = NULL,
-    fc.results = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
@@ -215,8 +220,9 @@ testDE.DimReduc <- function(
     cells.2 = cells.2,
     test.use = test.use,
     features = features,
-    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
     seed = seed,
@@ -235,11 +241,12 @@ testDE.Seurat <- function(
     group.by = NULL,
     slot = "data",
     features = NULL,
-    fc.results = NULL,
     assay = NULL,
     reduction = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
@@ -282,8 +289,9 @@ testDE.Seurat <- function(
     cells.2 = cells$cells.2,
     test.use = test.use,
     features = features,
-    fc.results = fc.results,
     p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
     min.cells.group = min.cells.group,
     max.cells.per.ident = max.cells.per.ident,
     seed = seed,
@@ -305,11 +313,6 @@ testDE.Seurat <- function(
   mean.fxn
 }
 
-#' @importFrom Eula.utils selectDE
-#' @export
-#' @method testDE StdAssay
-testDE.StdAssay <- testDE.Assay
-
 #' @importFrom Eula.utils differExp
 #' @export
 #' @method differExp Assay
@@ -322,6 +325,9 @@ differExp.Assay <- function(
     features = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
+    filter.nosig = TRUE,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
     logfc.threshold = 0.1,
@@ -349,40 +355,51 @@ differExp.Assay <- function(
     min.diff.pct <- -Inf
     logfc.threshold <- 0
   }
-  fc.results <- foldChange(
-    object,
+  if (test.use %in% DE.METHODS$counts) {
+    slot <- "counts"
+  }
+  mean.fxn <- .select_mean_fxn(slot = fc.slot, mean.fxn = mean.fxn)
+  data <- GetAssayData(object, slot)
+  fc.data <- GetAssayData(object, fc.slot)
+  features <- features %||% rownames(data)
+  if (!setequal(features, rownames(data))) {
+    data <- data[features, , drop = FALSE]
+  }
+  if (!setequal(features, rownames(fc.data))) {
+    fc.data <- fc.data[features, , drop = FALSE]
+  }
+  differExp(
+    object = data,
     cells.1 = cells.1,
     cells.2 = cells.2,
-    slot = fc.slot,
-    mean.fxn = mean.fxn,
-    min.exp = min.exp,
-    pseudocount.use = pseudocount.use,
-    base = base
-  )
-  fc.results <- selectDE(
-    fc.results = fc.results,
+    fc.data = fc.data,
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
+    filter.nosig = filter.nosig,
+    min.cells.group = min.cells.group,
+    max.cells.per.ident = max.cells.per.ident,
     logfc.threshold = logfc.threshold,
     min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
-    only.pos = only.pos
-  )
-  testDE(
-    object,
-    cells.1 = cells.1,
-    cells.2 = cells.2,
-    slot = slot,
-    fc.results = fc.results,
-    test.use = test.use,
-    p.adjust.method = p.adjust.method,
-    min.cells.group = min.cells.group,
-    max.cells.per.ident = max.cells.per.ident,
+    only.pos = only.pos,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp,
+    pseudocount.use = pseudocount.use,
+    base = base,
+    seed = seed,
     latent.vars = latent.vars,
     densify = densify,
     ...
   )
 }
+
+#' @export
+#' @method differExp StdAssay
+differExp.StdAssay <- differExp.Assay
 
 #' @export
 #' @method differExp DimReduc
@@ -393,6 +410,9 @@ differExp.DimReduc <- function(
     features = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
+    filter.nosig = TRUE,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
     logfc.threshold = 0.1,
@@ -404,9 +424,10 @@ differExp.DimReduc <- function(
     mean.fxn = NULL,
     min.exp = 0,
     pseudocount.use = 1,
-    base = 2,
+    base = -1,
     seed = 42,
     latent.vars = NULL,
+    densify = FALSE,
     ...
 ) {
   if (test.use %in% DE.METHODS$counts) {
@@ -416,8 +437,9 @@ differExp.DimReduc <- function(
       paste(DE.METHODS$counts, collapse = ", ")
     )
   }
+  data <- t(Embeddings(object))
   .validate_cell_groups(
-    data.use = object,
+    data.use = data,
     cells.1 = cells.1,
     cells.2 = cells.2,
     min.cells.group = min.cells.group
@@ -427,42 +449,41 @@ differExp.DimReduc <- function(
     logfc.threshold <- 0
   }
   mean.fxn <- mean.fxn %||% Matrix::rowMeans
-  data <- t(Embeddings(object))
-  if (!is.null(features)) {
+  features <- features %||% rownames(data)
+  if (!setequal(features, rownames(data))) {
     data <- data[features, , drop = FALSE]
   }
-  fc.results <- foldChange(
-    data,
+  de.results <- differExp(
+    object = data,
     cells.1 = cells.1,
     cells.2 = cells.2,
-    mean.fxn = mean.fxn,
-    min.exp = min.exp,
-    pseudocount.use = pseudocount.use,
-    base = base
-  )
-  fc.results <- selectDE(
-    fc.results = fc.results,
+    fc.data = data,
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
+    filter.nosig = filter.nosig,
+    min.cells.group = min.cells.group,
+    max.cells.per.ident = max.cells.per.ident,
     logfc.threshold = logfc.threshold,
     min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
-    only.pos = only.pos
-  )
-
-  # Actually perform the DE test
-  testDE(
-    data,
-    cells.1 = cells.1,
-    cells.2 = cells.2,
-    fc.results = fc.results,
-    test.use = test.use,
-    p.adjust.method = p.adjust.method,
-    min.cells.group = min.cells.group,
-    max.cells.per.ident = max.cells.per.ident,
+    only.pos = only.pos,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp,
+    pseudocount.use = pseudocount.use,
+    base = base,
+    seed = seed,
     latent.vars = latent.vars,
+    densify = FALSE,
     ...
   )
+  if (test.use == "roc") {
+    return(de.results[order(-de.results$power, -de.results[[1]]), ])
+  }
+  de.results[order(-de.results$p_val, -de.results[[1]]), ]
 }
 
 #' @export
@@ -478,6 +499,9 @@ differExp.Seurat <- function(
     reduction = NULL,
     test.use = "wilcox",
     p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
+    filter.nosig = TRUE,
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
@@ -498,9 +522,7 @@ differExp.Seurat <- function(
   if (!is.null(assay) && !is.null(reduction)) {
     stop("Please only specify either assay or reduction.")
   }
-  if (!is.null(group.by)) {
-    Idents(object) <- group.by
-  }
+  object <- .check_group_by(object, group.by = group.by)
   # select which data to use
   if (is.null(reduction)) {
     assay <- assay %||% DefaultAssay(object)
@@ -509,6 +531,7 @@ differExp.Seurat <- function(
   } else {
     data.use <- object[[reduction]]
     cellnames.use <- rownames(data.use)
+    base <- -1
   }
   cells <- .ident_to_cells_diff(
     object = object,
@@ -530,44 +553,30 @@ differExp.Seurat <- function(
     cells.2 = cells$cells.2,
     min.cells.group = min.cells.group
   )
-  fc.results <- foldChange(
+  differExp(
     object = data.use,
     cells.1 = cells$cells.1,
     cells.2 = cells$cells.2,
     slot = slot,
+    fc.slot = slot,
     features = features,
-    mean.fxn = mean.fxn,
-    min.exp = min.exp,
-    pseudocount.use = pseudocount.use,
-    base = base
-  )
-  fc.results <- selectDE(
-    fc.results = fc.results,
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
+    filter.nosig = filter.nosig,
+    min.cells.group = min.cells.group,
+    max.cells.per.ident = max.cells.per.ident,
     logfc.threshold = logfc.threshold,
     min.mean.exp = min.mean.exp,
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
-    only.pos = only.pos
-  )
-
-  # fetch latent.vars
-  if (!is.null(latent.vars)) {
-    latent.vars <- FetchData(
-      object = object,
-      vars = latent.vars,
-      cells = c(cells$cells.1, cells$cells.2)
-    )
-  }
-  testDE(
-    object = data.use,
-    cells.1 = cells$cells.1,
-    cells.2 = cells$cells.2,
-    test.use = test.use,
-    fc.results = fc.results,
-    p.adjust.method = p.adjust.method,
-    min.cells.group = min.cells.group,
-    max.cells.per.ident = max.cells.per.ident,
+    only.pos = only.pos,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp,
+    pseudocount.use = pseudocount.use,
+    base = base,
     seed = seed,
     latent.vars = latent.vars,
     densify = densify,
@@ -588,8 +597,9 @@ findAllMarkers <- function(
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
-    return.thresh = 1e-2,
+    p.thresh = 1e-2,
     use.adjust = TRUE,
+    filter.nosig = TRUE,
 
     logfc.threshold = 0.1,
     min.mean.exp = 0,
@@ -610,21 +620,16 @@ findAllMarkers <- function(
   if ((test.use == "roc") && (return.thresh == 1e-2)) {
     return.thresh <- 0.7
   }
-  if (!is.null(group.by) && !identical(group.by, "ident")) {
-    if (length(group.by) == 1 && ! group.by %in% colnames(object@meta.data)) {
-      stop("'", group.by, "' not found in object metadata")
-    }
-    Idents(object) <- group.by
-  }
+  object <- .check_group_by(object, group.by = group.by)
   idents.all <- sort(unique(Idents(object)))
 
-  genes.de <- list()
-  messages <- list()
-  for (i in 1:length(x = idents.all)) {
+  gde.all <- list()
+  for (i in seq_along(idents.all)) {
+    ident <- idents.all[i]
     if (verbose) {
-      message("Calculating cluster ", idents.all[i])
+      message("Calculating cluster ", ident)
     }
-    genes.de[[i]] <- tryCatch(
+    gde <- tryCatch(
       expr = {
         differExp(
           object = object,
@@ -635,6 +640,9 @@ findAllMarkers <- function(
           assay = assay,
           test.use = test.use,
           p.adjust.method = p.adjust.method,
+          p.thresh = p.thresh,
+          use.adjust = use.adjust,
+          filter.nosig = filter.nosig,
           latent.vars = latent.vars,
           min.cells.group = min.cells.group,
           max.cells.per.ident = max.cells.per.ident,
@@ -655,12 +663,69 @@ findAllMarkers <- function(
       },
       error = function(cond) return(cond$message)
     )
-    if (is.character(genes.de[[i]])) {
-      messages[[i]] <- genes.de[[i]]
-      genes.de[[i]] <- NULL
+    if (is.character(gde)) {
+      fastWarning("Testing ", ident, " failed:\n\t", gde)
+      next
     }
+    if (nrow(gde) == 0) {
+      next
+    }
+    gde$cluster <- ident
+    gde$gene <- rownames(gde)
+    rownames(gde) <- NULL
+    gde.all[[ident]] <- gde
   }
-  gde.all <- data.frame()
+  gde.all <- Reduce(rbind, gde.all)
+  gde.all
+}
+
+findGroupDiffer <- function(
+    object,
+    group.data,
+    differs,
+
+    group.by = NULL,
+    assay = NULL,
+    features = NULL,
+    slot = 'data',
+
+    diff.type = c("all", "only_bulk", "no_bulk"),
+
+    test.use = "wilcox",
+    p.adjust.method = "bonferroni",
+    p.thresh = 1e-2,
+    use.adjust = TRUE,
+    latent.vars = NULL,
+    min.cells.group = 3,
+    max.cells.per.ident = Inf,
+
+    logfc.threshold = 0.1,
+    min.mean.exp = 0,
+    min.pct = 0.01,
+    min.diff.pct = -Inf,
+    min.cells.feature = 3,
+    only.pos = FALSE,
+
+    mean.fxn = NULL,
+    min.exp = 0,
+    pseudocount.use = 1,
+    base = 2,
+    seed = 42,
+    densify = FALSE,
+    verbose = TRUE,
+    ...
+) {
+  if (!is.list(differs)) {
+    stop("'differs' must be a list containing comparison information.")
+  }
+
+  diff.type <- match.arg(diff.type)
+  is.bulk <- diff.type %in% c("all", "only_bulk")
+  is.cluster <- diff.type %in% c("all", "no_bulk")
+
+  if ((test.use == "roc") && (return.thresh == 1e-2)) {
+    return.thresh <- 0.7
+  }
   p.col <- "p_val"
   if (use.adjust) {
     p.col <- "p_val_adj"
@@ -668,42 +733,105 @@ findAllMarkers <- function(
   if (test.use == "roc") {
     p.col <- "AUC"
   }
-  for (i in 1:length(idents.all)) {
-    if (is.null(unlist(genes.de[i]))) {
-      next
-    }
-    gde <- genes.de[[i]]
-    if (nrow(gde) > 0) {
-      if (test.use == "roc") {
-        idx <- (gde$AUC > return.thresh | gde$AUC < (1 - return.thresh))
-      } else {
-        idx <- gde[[p.col]] < return.thresh
-      }
-      gde <- gde[idx, , drop = FALSE]
-      gde <- gde[order(gde[[p.col]], -abs(gde$pct.1-gde$pct.2)), , drop = FALSE]
 
-      if (nrow(gde) > 0) {
-        gde$cluster <- idents.all[i]
-        gde$gene <- rownames(gde)
-        gde.all <- rbind(gde.all, gde)
+  if (!is.null(assay) && !is.null(reduction)) {
+    stop("Please only specify either assay or reduction.")
+  }
+  if (is.null(reduction)) {
+    assay <- assay %||% DefaultAssay(object)
+    DefaultAssay(object) <- assay
+    data.use <- object[[assay]]
+    cellnames.use <-  colnames(data.use)
+  } else {
+    data.use <- object[[reduction]]
+    cellnames.use <- rownames(data.use)
+  }
+
+  object <- .check_group_by(object, group.by = group.by)
+  cells.cluster <- list()
+  if (is.bulk) {
+    cells.cluster[["BULK"]] <- cellnames.use
+  }
+  if (is.cluster) {
+    cells.cluster <- c(cells.cluster, split(cellnames.use, f = Idents(object)))
+  }
+
+  markers <- list()
+  for (i in seq_along(differs)) {
+    diff <- differs[[i]]
+    if (any(!diff %in% colnames(group.data))) {
+      bad.groups <- paste(setdiff(diff, colnames(group.data)), collapse = ", ")
+      stop("The following groups are not found:\n ", bad.groups)
+    }
+    gde.all <- list()
+    for (cluster in names(cells.cluster)) {
+      cells <- cells.cluster[[cluster]]
+      cells.1 <- intersect(cells, rownames(group.data)[group.data[, diff[[1]]]])
+      cells.2 <- intersect(cells, rownames(group.data)[group.data[, diff[[2]]]])
+
+      if (verbose) {
+        message("Calculating cluster ", cluster)
       }
+      gde <- tryCatch(
+        expr = {
+          differExp(
+            object = data.use,
+            cells.1 = cells.1,
+            cells.2 = cells.2,
+            slot = slot,
+            features = features,
+            assay = assay,
+            test.use = test.use,
+            p.adjust.method = p.adjust.method,
+            p.thresh = p.thresh,
+            use.adjust = use.adjust,
+            filter.nosig = filter.nosig,
+            latent.vars = latent.vars,
+            min.cells.group = min.cells.group,
+            max.cells.per.ident = max.cells.per.ident,
+            logfc.threshold = logfc.threshold,
+            min.mean.exp = min.mean.exp,
+            min.pct = min.pct,
+            min.diff.pct = min.diff.pct,
+            min.cells.feature = min.cells.feature,
+            only.pos = only.pos,
+            mean.fxn = mean.fxn,
+            min.exp = min.exp,
+            pseudocount.use = pseudocount.use,
+            base = base,
+            seed = seed,
+            densify = densify,
+            ...
+          )
+        },
+        error = function(cond) return(cond$message)
+      )
+      if (is.character(gde)) {
+        fastWarning("Testing ", ident, " failed:\n\t", gde)
+        next
+      }
+      if (nrow(gde) == 0) {
+        next
+      }
+      gde$cluster <- ident
+      gde$gene <- rownames(gde)
+      rownames(gde) <- NULL
+      gde.all[[ident]] <- gde
+
+
+
+
+
     }
+
   }
-  if (nrow(gde.all) == 0) {
-    fastWarning("No DE genes identified")
-  }
-  rownames(gde.all) <- make.unique(as.character(gde.all$gene))
-  if (length(messages) == 0) {
-    return(gde.all)
-  }
-  fastWarning("The following tests were not performed: ")
-  for (i in seq_along(messages)) {
-    if (!is.null(messages[[i]])) {
-      fastWarning("When testing ", idents.all[i], ":\n\t", messages[[i]])
-    }
-  }
-  gde.all
+
+
+
 }
+
+
+
 
 #' @importFrom dplyr arrange desc slice_head starts_with
 #' @export
@@ -726,3 +854,16 @@ getTopMarkers <- function(markers, top.n = 5, group.by = "cluster", ...) {
   }
   object
 }
+
+.check_group_by <- function(object, group.by = NULL) {
+  if (!is.null(group.by) && !identical(group.by, "ident")) {
+    group.by <- group.by[1]
+    if (length(group.by) == 1 && ! group.by %in% colnames(object@meta.data)) {
+      stop("'", group.by, "' not found in object metadata")
+    }
+    Idents(object) <- group.by
+  }
+  object
+}
+
+
