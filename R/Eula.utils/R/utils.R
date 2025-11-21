@@ -37,7 +37,7 @@ recodeFactor.data.frame <- function(x, map, column, keep.orders = FALSE, ...) {
   message("Replace entries in column '", column, "':")
   x[, paste0(column, "_old")] <- x[, column]
   x[, column] <- recodeFactor(x[, column], map = map, keep.orders = keep.orders)
-  print(table(x[, column], x[, paste0(column, "_old")]))
+  capture.msg(table(x[, column], x[, paste0(column, "_old")]))
   x
 }
 
@@ -186,6 +186,7 @@ loadPackages <- function(packages, lib.loc = .libPaths()) {
     message(paste0(" ~~~> ", i, " <~~~"))
     suppressMessages(library(i, lib.loc = lib.loc, character.only = TRUE))
   }
+  invisible(NULL)
 }
 
 #' @export
@@ -270,7 +271,7 @@ fetch_color_table_file <- function(file) {
   rename_table <- readTable(tools::file_path_as_absolute(file), header = FALSE)
   parameter <- list()
   parameter$colors <- fetch_color_dataframe(rename_table)
-  return(parameter)
+  parameter
 }
 
 #' @export
@@ -307,6 +308,7 @@ mkdir <- function(path, chdir = FALSE) {
   if (chdir) {
     setwd(path)
   }
+  invisible(NULL)
 }
 
 # find_group_index <- function(
@@ -373,7 +375,7 @@ check_complete <- function(file) {
 }
 
 #' @export
-norm_list_param <- function(x, ...) {
+norm_list_param <- function(x, sep = "\t", ...) {
   if (length(x) == 0) {
     return(x)
   }
@@ -384,7 +386,7 @@ norm_list_param <- function(x, ...) {
     return(x)
   }
   if (file.exists(x)) {
-    x <- readTable(x, header = FALSE, ...)[, 1]
+    x <- readTable(x, sep = sep, header = FALSE, ...)[, 1]
     return(x)
   }
   if (grepl("\\S,\\S", x)) {

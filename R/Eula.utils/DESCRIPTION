@@ -27,4 +27,6 @@ Suggests:
     limma,
     MAST,
     randomcoloR,
-    scattermore
+    scattermore,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

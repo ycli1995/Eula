@@ -5,7 +5,7 @@ NULL
 #' @export
 pipe_DimPlot <- function(obj, params = list(), ...) {
   params[['outdir']] <- params[['outdir']] %||% getwd()
-  params[['basic.size']] <- params[['basic.size']] %||% 6
+  params[['basic.size']] <- params[['basic.size']] %||% 5.5
   params[['reductions']] <- params[['reductions']] %||% c("umap", "tsne")
   params[['corner.axis']] <- params[['corner.axis']] %||% TRUE
 
@@ -86,7 +86,7 @@ save_multi_DimPlot <- function(
 save_DimPlot <- function(
     obj,
     outfile = NULL,
-    basic.size = 6,
+    basic.size = 5.5,
     reduction = "umap",
     group.by = NULL,
     label = NULL,

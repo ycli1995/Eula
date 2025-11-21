@@ -38,6 +38,6 @@ checkPackages <- function(pkgs, required = TRUE) {
 
 #' @export
 validCharacters <- function(x) {
-  nzchar(x = x, keepNA = FALSE) & !is.na(x = x) & is.atomic(x = x)
+  nzchar(x, keepNA = FALSE) & !is.na(x) & is.atomic(x)
 }
 
