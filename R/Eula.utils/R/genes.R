@@ -15,7 +15,9 @@ getFeaturesID.data.frame <- function(object, features, uniq = FALSE, ...) {
   for (i in cols) {
     object[[i]] <- toupper(object[[i]])
   }
-  features <- sapply(features, function(x) {
+  to.search <- which(!features %in% rownames(object))
+  features <- as.list(features)
+  features[to.search] <- sapply(features[to.search], function(x) {
     g5 <- rownames(object) %in% x
     if (any(g5)) {
       return(rownames(object)[g5])

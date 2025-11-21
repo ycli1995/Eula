@@ -75,7 +75,7 @@ CalAvgPct <- function(
 #' @export
 GetRowAnnot <- function(object, features, row.type = "Gene", ...) {
   gene.ids <- getFeaturesName(object, features = features, col = "id")
-  gene.names <- getFeaturesName(object, features = gene.ids, col = "name")
+  gene.names <- getFeaturesName(object, features = features, col = "name")
   annot <- data.frame(gene.ids, gene.names)
   colnames(annot) <- paste0(row.type, c("ID", "Name"))
   annot

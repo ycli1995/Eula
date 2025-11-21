@@ -420,15 +420,15 @@ foldChange.CsparseMatrix <- function(
   colnames(out$avg.exp) <- c("mean.1", "mean.2")
   p1 <- pseudocount.use / length(cells.1)
   p2 <- pseudocount.use / length(cells.2)
-  if (base > 0) {
+  if (base < 0) {
+    fc <- (out$avg.exp[, 1] + p1) - (out$avg.exp[, 2] + p2)
+    fc.name <- "avg_diff"
+  } else {
     fc <- log(out$avg.exp[, 1] + p1, base) - log(out$avg.exp[, 2] + p2, base)
     if (base == exp(1)) {
       base <- ""
     }
     fc.name <- paste0("avg_log", base, "FC")
-  } else {
-    fc <- (out$avg.exp[, 1] + p1) - (out$avg.exp[, 2] + p2)
-    fc.name <- "avg_diff"
   }
   fc.results <- cbind(fc, out$avg.exp, out$n.cells, out$avg.pct)
   colnames(fc.results)[1] <- fc.name
@@ -610,6 +610,7 @@ differMAST.matrix <- function(
 
   zlmCond <- MAST::zlm(formula = fmla, sca = sca, ...)
   summaryDt <- MAST::summary(zlmCond, doLRT = 'conditionGroup2')$datatable
+  summaryDt <- as.data.frame(summaryDt)
   summaryDt <- summaryDt[summaryDt[, "component"] == "H", , drop = FALSE]
   data.frame(p_val = summaryDt[, 4], row.names = summaryDt[, 1])
 }

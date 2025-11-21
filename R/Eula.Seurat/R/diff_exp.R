@@ -50,7 +50,7 @@ foldChange.DimReduc <- function(
     mean.fxn = NULL,
     min.exp = 0,
     pseudocount.use = 1,
-    base = 2,
+    base = -1,
     ...
 ) {
   mean.fxn <- mean.fxn %||% Matrix::rowMeans
@@ -679,6 +679,7 @@ findAllMarkers <- function(
   gde.all
 }
 
+#' @export
 findGroupDiffer <- function(
     object,
     group.data,
@@ -686,6 +687,7 @@ findGroupDiffer <- function(
 
     group.by = NULL,
     assay = NULL,
+    reduction = NULL,
     features = NULL,
     slot = 'data',
 
@@ -695,6 +697,7 @@ findGroupDiffer <- function(
     p.adjust.method = "bonferroni",
     p.thresh = 1e-2,
     use.adjust = TRUE,
+    filter.nosig = FALSE,
     latent.vars = NULL,
     min.cells.group = 3,
     max.cells.per.ident = Inf,
@@ -745,6 +748,7 @@ findGroupDiffer <- function(
   } else {
     data.use <- object[[reduction]]
     cellnames.use <- rownames(data.use)
+    base <- -1
   }
 
   object <- .check_group_by(object, group.by = group.by)
@@ -807,31 +811,23 @@ findGroupDiffer <- function(
         error = function(cond) return(cond$message)
       )
       if (is.character(gde)) {
-        fastWarning("Testing ", ident, " failed:\n\t", gde)
+        fastWarning("Testing ", cluster, " failed:\n\t", gde)
         next
       }
       if (nrow(gde) == 0) {
         next
       }
-      gde$cluster <- ident
+      gde$cluster <- cluster
       gde$gene <- rownames(gde)
       rownames(gde) <- NULL
-      gde.all[[ident]] <- gde
-
-
-
-
-
+      gde.all[[cluster]] <- gde
     }
-
+    gde.all <- Reduce(rbind, gde.all)
+    diff <- paste(diff, collapse = "-vs-")
+    markers[[diff]] <- gde.all
   }
-
-
-
+  markers
 }
-
-
-
 
 #' @importFrom dplyr arrange desc slice_head starts_with
 #' @export

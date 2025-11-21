@@ -827,7 +827,7 @@ pipe_FindAllMarkers <- function(obj, params = list(), ...) {
     min.cells.feature = 3,
     only.pos = TRUE,
     min.exp = 0,
-    pseudocount.use = 1,
+    pseudocount.use = 0.000001,
     base = 2,
     seed = 42
   )
@@ -899,6 +899,179 @@ pipe_MultiCore <- function(params = list(), ...) {
 }
 
 #' @export
+pipe_GroupCells <- function(obj, params = list(), ...) {
+  Message("Grouping cells")
+  capture.msg(str(params))
+
+  out0 <- data.frame(row.names = Cells(obj))
+  if (length(params[['group.by']]) > 0) {
+    group.by <- params[['group.by']]
+    group.by <- Reduce(pasteFactors, as.list(obj[[group.by, drop = FALSE]]))
+    cell.groups <- split(Cells(obj), f = group.by)
+    params[['cell.groups']] <- c(params[['cell.groups']], cell.groups)
+  }
+  if (length(params[['cell.groups']]) > 0) {
+    out <- group_cells(
+      cell.groups = params[['cell.groups']],
+      cells = rownames(out0)
+    )
+    out0 <- cbind(out0, out[rownames(out0), , drop = FALSE])
+  }
+  if (length(params[['meta.data']]) > 0) {
+    out <- group_cells_by_meta(obj[[]], groups = params[['meta.data']])
+    if (any(colnames(out) %in% colnames(out0))) {
+      bad.names <- intersect(colnames(out), colnames(out0))
+      stop("Duplicated group names:\n ", paste(bad.names, collapse = ", "))
+    }
+    out0 <- cbind(out0, out[rownames(out0), , drop = FALSE])
+  }
+  if (length(params[['features']]) > 0) {
+    for (i in seq_along(params[['features']])) {
+      genes <- names(params[['features']][[i]])
+      genes <- getFeaturesID(obj, genes, uniq = TRUE)
+      if (length(genes) == 0) {
+        stop("No valid features found.")
+      }
+      if (length(genes) != length(params[['features']][[i]])) {
+        stop("Invalid features found.")
+      }
+      if (any(!genes %in% rownames(obj))) {
+        bad.genes <- setdiff(genes, rownames(obj))
+        stop("Invalid features:\n ", paste(bad.genes, collapse = ", "))
+      }
+      names(params[['features']][[i]]) <- genes
+    }
+    out <- group_cells_by_features(
+      GetAssayData(obj),
+      groups = params[['features']]
+    )
+    if (any(colnames(out) %in% colnames(out0))) {
+      bad.names <- intersect(colnames(out), colnames(out0))
+      stop("Duplicated group names:\n ", paste(bad.names, collapse = ", "))
+    }
+    out0 <- cbind(out0, out[rownames(out0), , drop = FALSE])
+  }
+  n.cells <- colSums(out0)
+  bad.groups <- names(n.cells)[n.cells == 0]
+  if (length(bad.groups) > 0) {
+    stop(
+      "The following groups contain no cells:\n ",
+      paste(bad.groups, collapse = ", ")
+    )
+  }
+  out0
+}
+
+#' @export
+pipe_GroupDiffer <- function(obj, params = list(), ...) {
+  Message("Running GroupDiffer")
+
+  outdir <- params[['outdir']] %||% getwd()
+
+  defaults <- list(
+    group.by = NULL,
+    assay = NULL,
+    reduction = NULL,
+    features = NULL,
+    slot = 'data',
+    diff.type = "all",
+    test.use = "MAST",
+    p.adjust.method = "bonferroni",
+    p.thresh = 0.05,
+    use.adjust = TRUE,
+    latent.vars = NULL,
+    min.cells.group = 3,
+    max.cells.per.ident = Inf,
+    logfc.threshold = 0.1,
+    min.mean.exp = 0,
+    min.pct = 0.01,
+    min.diff.pct = -Inf,
+    min.cells.feature = 3,
+    only.pos = FALSE,
+    min.exp = 0,
+    pseudocount.use = 0.000001,
+    base = 2,
+    seed = 42
+  )
+  params[['findGroupDiffer']] <- fetch_default_params(
+    defaults = defaults,
+    params = params[['findGroupDiffer']]
+  )
+  capture.msg(str(params))
+
+  differs <- params[['differs']]
+  if (length(differs) == 0) {
+    stop("No 'differs' found.")
+  }
+  group.data <- pipe_GroupCells(obj, params[['GroupCells']])
+
+  params <- params[['findGroupDiffer']]
+  params[['features']] <- norm_list_param(params[['features']])
+  params[['features']] <- getFeaturesID(obj, params[['features']])
+
+  list2env(params, envir = environment())
+  features <- params[['features']]
+  assay <- params[['assay']]
+  reduction <- params[['reduction']]
+  group.by <- params[['group.by']]
+  latent.vars <- params[['latent.vars']]
+
+  markers <- findGroupDiffer(
+    object = obj,
+    group.data = group.data,
+    differs = differs,
+    assay = assay,
+    group.by = group.by,
+    features = features,
+    slot = slot,
+    diff.type = diff.type,
+    test.use = test.use,
+    p.adjust.method = p.adjust.method,
+    p.thresh = p.thresh,
+    use.adjust = use.adjust,
+    filter.nosig = FALSE,
+    latent.vars = latent.vars,
+    min.cells.group = min.cells.group,
+    max.cells.per.ident = max.cells.per.ident,
+    logfc.threshold = logfc.threshold,
+    min.mean.exp = min.mean.exp,
+    min.pct = min.pct,
+    min.diff.pct = min.diff.pct,
+    min.cells.feature = min.cells.feature,
+    only.pos = only.pos,
+    mean.fxn = NULL,
+    min.exp = min.exp,
+    pseudocount.use = pseudocount.use,
+    base = base,
+    seed = seed,
+    densify = FALSE,
+    verbose = TRUE,
+    ...
+  )
+  for (i in seq_along(markers)) {
+    diff <- names(markers)[i]
+    annot <- GetRowAnnot(obj, markers[[i]]$gene)
+    markers[[i]] <- cbind(annot, as.data.frame(markers[[i]])) %>%
+      dplyr::mutate(Clusters = cluster, .before = 1) %>%
+      select(!c("gene", "cluster")) %>%
+      as.data.frame()
+    outfile <- paste0("GroupDiffer.", diff, ".all.xls")
+    writeTable(markers[[i]], file.path(outdir, outfile))
+  }
+  save(markers, file = file.path(outdir, "markers.Rda"))
+
+  for (i in seq_along(markers)) {
+    diff <- names(markers)[i]
+    markers[[i]] <- markers[[i]] %>%
+      dplyr::filter(significance != "nosig")
+    outfile <- paste0("GroupDiffer.", diff, ".filtered.xls")
+    writeTable(markers[[i]], file.path(outdir, outfile))
+  }
+
+  markers
+}
+
+#' @export
 pipe_FindAllMarkers_R <- function(params = list(), ...) {
   outdir <- params[['outdir']] %||% getwd()
 
@@ -908,6 +1081,21 @@ pipe_FindAllMarkers_R <- function(params = list(), ...) {
 
   mkdir(outdir, chdir = TRUE)
   markers <- pipe_FindAllMarkers(obj, params[['FindAllMarkers']])
+
+  invisible(markers)
+}
+
+#' @export
+pipe_GroupDiffer_R <- function(params = list(), ...) {
+  outdir <- params[['outdir']] %||% getwd()
+
+  pipe_MultiCore(params)
+
+  obj <- pipe_GetSeuratObj(params)
+
+  mkdir(outdir, chdir = TRUE)
+  params[['GroupDiffer']][['outdir']] <- outdir
+  markers <- pipe_GroupDiffer(obj, params[['GroupDiffer']])
 
   invisible(markers)
 }
