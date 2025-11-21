@@ -820,7 +820,6 @@ pipe_FindAllMarkers <- function(obj, params = list(), ...) {
     return.thresh = 1e-2,
     use.adjust = TRUE,
     logfc.threshold = 0.25,
-    top.n = 5,
     min.mean.exp = 0,
     min.pct = 0.01,
     min.diff.pct = -Inf,
@@ -879,10 +878,38 @@ pipe_FindAllMarkers <- function(obj, params = list(), ...) {
 
   StatMarker(markers, colors = obj@misc$colors[[group.by]])
 
+  markers
+}
+
+#' @export
+pipe_PostFindAllMarkers <- function(obj, markers, params = list(), ...) {
+  Message('>>>>> Running post-FindAllMarkers')
+  defaults <- list(
+    outdir = getwd(),
+    top.n = 5,
+    group.by = "seurat_clusters",
+    coord.flip = TRUE
+  )
+  params <- fetch_default_params(defaults, params)
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+
   top <- getTopMarkers(markers, top.n = top.n, group.by = "Clusters")
   writeTable(top, file.path(outdir, "Top.list.xls"))
 
-  markers
+  features <- unique(top$GeneID)
+
+  Message('Plotting DotPlot')
+  save_multi_DotPlot(
+    obj,
+    features = features,
+    outdir = outdir,
+    group.by = group.by,
+    coord.flip = coord.flip,
+    ...
+  )
+
+  invisible(markers)
 }
 
 #' @export
@@ -1081,6 +1108,12 @@ pipe_FindAllMarkers_R <- function(params = list(), ...) {
 
   mkdir(outdir, chdir = TRUE)
   markers <- pipe_FindAllMarkers(obj, params[['FindAllMarkers']])
+
+  markers <- pipe_PostFindAllMarkers(
+    obj = obj,
+    markers = markers,
+    params = params[['PostFindAllMarkers']]
+  )
 
   invisible(markers)
 }

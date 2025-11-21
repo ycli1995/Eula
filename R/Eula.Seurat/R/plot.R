@@ -256,14 +256,13 @@ dot_plot.CsparseMatrix <- function(
 ) {
   mean.fxn <- mean.fxn %||% function(x) rowExpMean(x, log = TRUE)
   group.by <- as.factor(group.by)
+
+  id <- group.by
   if (length(split.by) > 0) {
     if (length(split.by) != ncol(object)) {
       stop("'split.by' must have the same length as 'ncol(object)'.")
     }
     id <- droplevels(pasteFactors(group.by, split.by))
-  } else {
-    id <- group.by
-    split.by <- NA
   }
   cell.groups <- split(colnames(object), f = id)
   out <- rowMeanPct(
@@ -272,20 +271,21 @@ dot_plot.CsparseMatrix <- function(
     mean.fxn = mean.fxn,
     min.exp = min.exp
   )
-  group.data <- data.frame(
-    id = id,
-    group = group.by,
-    split = split.by
-  ) %>%
+
+  group.data <- data.frame(id = id, group.by = group.by)
+  if (length(split.by) > 0) {
+    group.data$split.by <- split.by
+  }
+  group.data <- group.data %>%
     group_by(id) %>%
-    summarize(group = unique(group), split = unique(split))
-  group.by <- setNames(group.data$group, levels(id))
-  split.by <- setNames(group.data$split, levels(id))
+    summarize(across(everything(), unique)) %>%
+    as.data.frame()
+
   df <- .get_dot_plot_data(
     out$avg.exp,
     out$avg.pct,
-    group.by = group.by,
-    split.by = split.by,
+    group.by = group.data$group.by,
+    split.by = group.data$split.by,
     split.features = split.features
   )
   df$x <- df$group.by
@@ -388,6 +388,9 @@ dot_plot.Seurat <- function(
     theme = NULL,
     ...
 ) {
+  if (length(features) == 0) {
+    stop("No 'features' passed to `dot_plot`.")
+  }
   assay <- assay %||% DefaultAssay(object)
   DefaultAssay(object) <- assay
 

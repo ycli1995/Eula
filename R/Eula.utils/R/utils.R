@@ -291,10 +291,15 @@ fetch_color_dataframe <- function(color_table) {
 
 #' @export
 fetch_default_params <- function(defaults, params = list(), ...) {
+  null.params <- c()
   for (i in names(defaults)) {
     params[[i]] <- params[[i]] %||% defaults[[i]]
+    if (is.null(params[[i]])) {
+      null.params <- c(null.params, i)
+    }
   }
-  params
+  null.params <- sapply(null.params, function(x) NULL, simplify = FALSE)
+  c(params, null.params)
 }
 
 #' @export

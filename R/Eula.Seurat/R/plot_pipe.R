@@ -95,10 +95,9 @@ save_DimPlot <- function(
     corner.axis = FALSE,
     ...
 ) {
-  if (length(group.by) == 0) {
+  group.by <- group.by %0% "Idents"
+  if (group.by == "Idents") {
     obj$Idents <- Idents(obj)
-    group.by <- "Idents"
-    obj@misc$colors$Idents <- setColors(obj$Idents)
   }
   obj@meta.data <- droplevels(obj@meta.data)
 
@@ -143,6 +142,132 @@ save_DimPlot <- function(
 
   ## save plot
   p <- wrap_plots(p, nrow = 1)
-  ggsave(outfile, p, width = sum(w), height = basic.size, limitsize = FALSE)
+  ggsave2(outfile, p, width = sum(w), height = basic.size, limitsize = FALSE)
+  invisible(NULL)
+}
+
+#' @export
+pipe_DotPlot <- function(obj, params = list(), ...) {
+  defaults <- list(
+    outdir = getwd(),
+    group.by = NULL,
+    split.by = NULL,
+    assay = NULL,
+    theme = NULL,
+    min.exp = 0,
+    scale = TRUE,
+    color.limits = c(-2.5, 2.5),
+    size.limits = c(0, 100),
+    coord.flip = FALSE
+  )
+  params <- fetch_default_params(defaults, params)
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+
+  features <- norm_list_param(params[['features']])
+
+  save_multi_DotPlot(
+    obj = obj,
+    features = features,
+    outdir = outdir,
+    assay = assay,
+    group.by = group.by,
+    split.by = split.by,
+    split.features = split.features,
+    min.exp = min.exp,
+    scale = scale,
+    colors = colors,
+    color.limits = color.limits,
+    size.limits = size.limits,
+    coord.flip = coord.flip,
+    theme = theme,
+    ...
+  )
+}
+
+#' @importFrom Eula.utils norm_fname
+#' @export
+save_multi_DotPlot <- function(
+    obj,
+    features,
+    outdir = getwd(),
+    group.by = NULL,
+    split.by = NULL,
+    ...
+) {
+  group.by <- group.by %0% "Idents"
+  for (g in group.by) {
+    outfile <- paste("DotPlot", g, "pdf", sep = ".")
+    save_DotPlot(
+      obj = obj,
+      features = features,
+      outfile = file.path(outdir, norm_fname(outfile)),
+      group.by = g,
+      split.by = split.by,
+      ...
+    )
+  }
+  invisible(NULL)
+}
+
+#' @export
+save_DotPlot <- function(
+    obj,
+    features,
+    outfile = NULL,
+    assay = NULL,
+    group.by = NULL,
+    split.by = NULL,
+    split.features = NULL,
+    min.exp = 0,
+    scale = TRUE,
+    colors = NULL,
+    color.limits = c(-2.5, 2.5),
+    size.limits = c(0, 100),
+    coord.flip = FALSE,
+    theme = NULL,
+    ...
+) {
+  group.by <- group.by %0% "Idents"
+  if (group.by == "Idents") {
+    obj$Idents <- Idents(obj)
+  }
+  obj@meta.data <- droplevels(obj@meta.data)
+
+  features <- getFeaturesID(obj, features)
+  p <- dot_plot(
+    object = obj,
+    features = features,
+    assay = assay,
+    group.by = group.by,
+    split.by = split.by,
+    min.exp = min.exp,
+    scale = scale,
+    split.features = split.features,
+    colors = colors,
+    color.limits = color.limits,
+    size.limits = size.limits,
+    coord.flip = coord.flip,
+    theme = theme,
+    ...
+  )
+  features.col <- "y"
+  if (coord.flip) {
+    features.col <- "x"
+  }
+  levels(p$data[[features.col]]) <- getFeaturesName(
+    object = obj,
+    features = levels(p$data[[features.col]]),
+    col = "unique_name",
+    uniq = FALSE
+  )
+  if (is.null(outfile)) {
+    return(p)
+  }
+  w.str <- maxNChar(p$data$y) * 0.08
+  h.str <- maxNChar(p$data$x) * 0.075
+  w <- nlevels(p$data$x) * 0.25 + w.str + 1
+  h <- nlevels(p$data$y) * 0.25 + h.str + 0.5
+  ggsave2(outfile, p, width = w, height = h, limitsize = FALSE)
   invisible(NULL)
 }

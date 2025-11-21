@@ -35,4 +35,24 @@ test_that("norm_fname", {
   expect_equal(norm_fname("A(B))"), "A_B__")
 })
 
+test_that("fetch_default_params", {
+  params <- list(features = letters, cells = 1:10)
+  defaults <- list(
+    features = LETTERS,
+    group.by = "group",
+    split.by = character(),
+    use.name = TRUE,
+    assay = NULL,
+    reductions = NULL
+  )
+  params <- fetch_default_params(defaults = defaults, params = params)
+  list2env(params, envir = environment())
 
+  expect_null(assay)
+  expect_null(reductions)
+  expect_true(use.name)
+  expect_length(split.by, 0)
+  expect_equal(group.by, "group")
+  expect_equal(cells, 1:10)
+  expect_equal(features, letters)
+})
