@@ -96,7 +96,7 @@ save_DimPlot <- function(
     ...
 ) {
   group.by <- group.by %0% "Idents"
-  if (group.by == "Idents") {
+  if (identical(group.by, "Idents")) {
     obj$Idents <- Idents(obj)
   }
   obj@meta.data <- droplevels(obj@meta.data)
@@ -108,10 +108,7 @@ save_DimPlot <- function(
 
   legend <- legend %||% group.by
   legend <- intersect(legend, group.by)
-  theme <- theme %||% dot_theme_default()
-  if (corner.axis) {
-    theme <- theme + theme_dr()
-  }
+  theme <- theme %||% theme_base_default()
 
   p <- dim_plot(
     obj,
@@ -124,6 +121,7 @@ save_DimPlot <- function(
     combine = FALSE,
     label.repel = TRUE,
     legend = legend,
+    corner.axis = corner.axis,
     theme = theme,
     ...
   )
@@ -229,7 +227,7 @@ save_DotPlot <- function(
     ...
 ) {
   group.by <- group.by %0% "Idents"
-  if (group.by == "Idents") {
+  if (identical(group.by, "Idents")) {
     obj$Idents <- Idents(obj)
   }
   obj@meta.data <- droplevels(obj@meta.data)

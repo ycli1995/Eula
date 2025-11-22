@@ -119,6 +119,7 @@ single_dim_plot <- function(
     raster.dpi = c(512, 512),
     facet.args = list(),
     labs.args = list(),
+    corner.axis = FALSE,
     theme = NULL,
     guides = NULL,
     ...
@@ -158,15 +159,20 @@ single_dim_plot <- function(
   } else {
     p <- p + geom_point(mapping = mapping, size = pt.size, ...)
   }
-  if ("colour" %in% colnames(data) & !is.null(colors)) {
-    if (is.numeric(data$colour)) {
-      p <- p + scale_color_gradientn(colors = colors, limits = color.limits)
-    } else {
-      if (length(colors) < length(unique(data$colour))) {
-        fastWarning("Insufficient values in manual colors. Use default colors")
-      } else {
-        p <- p + scale_color_manual(values = colors)
+  if ("colour" %in% colnames(data)) {
+    if (is.numeric(data[['colour']])) {
+      if (!is.null(colors)) {
+        p <- p + scale_color_gradientn(colors = colors, limits = color.limits)
       }
+    } else {
+      if (!is.null(colors)) {
+        if (length(colors) < length(unique(data$colour))) {
+          fastWarning("Insufficient colors for manual. Use default colors")
+        } else {
+          p <- p + scale_color_manual(values = colors)
+        }
+      }
+      p <- p + dim_plot_guides()
     }
   }
   if (!is.null(label.data)) {
@@ -178,10 +184,12 @@ single_dim_plot <- function(
       color = label.color
     )
   }
-  p <- p + dim_plot_guides()
   p <- .add_my_facet_split(p = p, args = facet.args)
   p <- add_my_labs(p, args = labs.args)
   p <- add_my_theme(p, args = theme)
+  if (corner.axis) {
+    p <- add_corner_axis(p)
+  }
   p
 }
 

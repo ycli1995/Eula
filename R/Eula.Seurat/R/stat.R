@@ -31,6 +31,7 @@ StatFilterCells <- function(raw, filtered, group.by = "Samples") {
   df
 }
 
+#' @importFrom Eula.utils theme_dot_default
 #' @importFrom dplyr summarize
 #' @importFrom ggplot2 geom_bar theme_light
 #' @export
@@ -44,7 +45,7 @@ StatMarker <- function(markers, colors = NULL, outpfx = "DeGene.stat", ...) {
     geom_bar(stat = "identity") +
     theme_light() +
     labs(x = "", y = "Number of DE features") +
-    bar_theme_default() +
+    theme_dot_default() +
     theme(legend.position = "none")
   if (!is.null(colors)) {
     p <- p + scale_fill_manual(values = colors)

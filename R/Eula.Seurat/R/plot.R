@@ -5,19 +5,18 @@ dim_plot <- function(object, ...) {
 }
 
 #' @importFrom patchwork wrap_plots
-#' @importFrom ggplot2 theme_classic
+#' @importFrom Eula.utils theme_base_default theme_facet theme_no_legend
 #'
 #' @export
 #' @method dim_plot data.frame
 dim_plot.data.frame <- function(
     object,
     group.by,
+    dims = c(1, 2),
     split.by = NULL,
     shape.by = NULL,
-
-    dims = c(1, 2),
     ncol = NULL,
-    key = NULL,
+    key = "Dim",
 
     order = NULL,
     shuffle = FALSE,
@@ -38,6 +37,7 @@ dim_plot.data.frame <- function(
     raster = NULL,
     raster.dpi = c(512, 512),
     facet.args = list(),
+    corner.axis = FALSE,
     theme = NULL,
     ...
 ) {
@@ -66,7 +66,7 @@ dim_plot.data.frame <- function(
   labs.args <- setNames(paste0(key, dims), c("x", "y"))
   labs.args <- as.list(labs.args)
 
-  theme <- theme %||% theme_classic()
+  theme <- theme %||% theme_dim_default()
 
   ncol <- ncol %||% 4
   if (!is.null(split.by)) {
@@ -99,6 +99,9 @@ dim_plot.data.frame <- function(
       data[, 'shape'] <- object[, shape.by]
     }
 
+    if (isTRUE(order)) {
+      data <- data[order(data[['colour']]), , drop = FALSE]
+    }
     plist[[i]] <- single_dim_plot(
       data = data,
       colors = cols,
@@ -113,6 +116,7 @@ dim_plot.data.frame <- function(
       facet.args = facet.args,
       labs.args = labs.args,
       theme = theme,
+      corner.axis = corner.axis,
       alpha = pt.alpha,
       ...
     )
@@ -134,8 +138,8 @@ dim_plot.data.frame <- function(
 #' @method dim_plot Seurat
 dim_plot.Seurat <- function(
     object,
-    dims = c(1, 2),
     reduction = NULL,
+    dims = c(1, 2),
     cells = NULL,
 
     group.by = NULL,
@@ -161,6 +165,7 @@ dim_plot.Seurat <- function(
     raster = NULL,
     raster.dpi = c(512, 512),
     facet.args = list(),
+    corner.axis = FALSE,
     theme = NULL,
     ...
 ) {
@@ -225,6 +230,192 @@ dim_plot.Seurat <- function(
     raster = raster,
     raster.dpi = raster.dpi,
     facet.args = facet.args,
+    corner.axis = corner.axis,
+    theme = theme,
+    ...
+  )
+}
+
+#' @export feature_dim_plot
+feature_dim_plot <- function(object, ...) {
+  UseMethod("feature_dim_plot", object)
+}
+
+#' @importFrom Eula.utils theme_dim_default theme_facet
+#' @export
+#' @method feature_dim_plot data.frame
+feature_dim_plot.data.frame <- function(
+    object,
+    feature.data,
+    split.by = NULL,
+
+    dims = c(1, 2),
+    ncol = NULL,
+    key = "Dim",
+
+    order = NULL,
+    shuffle = FALSE,
+    seed = 42,
+    combine = TRUE,
+
+    colors = NULL,
+    pt.size = NULL,
+    pt.alpha = NULL,
+    raster = NULL,
+    raster.dpi = c(512, 512),
+    facet.args = list(),
+    corner.axis = FALSE,
+    theme = NULL,
+    ...
+) {
+  if (!is.matrix(feature.data)) {
+    stop("'feature.data' must be a matrix.")
+  }
+  if (nrow(feature.data) == 0) {
+    stop("No feature in `feature.data`.")
+  }
+  if (nrow(object) != ncol(feature.data)) {
+    stop("`nrow(object)` must be the same as `ncol(feature.data)`.")
+  }
+  if (!setequal(rownames(object), colnames(feature.data))) {
+    stop("`rownames(object)` must be the same as `colnames(feature.data)`")
+  }
+
+  if (isTRUE(shuffle)) {
+    set.seed(seed)
+    object <- object[sample(seq_len(nrow(object))), , drop = FALSE]
+  }
+
+  colnames(object)[dims] <- c("x", "y")
+  labs.args <- setNames(paste0(key, dims), c("x", "y"))
+  labs.args <- as.list(labs.args)
+  labs.args[['colour']] <- "Exp"
+
+  colors <- colors %||% c(
+    "#FFF7EC", "#FEE8C8", "#FDD49E", "#FDBB84", "#FC8D59",
+    "#EF6548", "#D7301F", "#B30000", "#7F0000"
+  )
+  theme <- theme %||% theme_dim_default()
+
+  ncol <- ncol %||% 4
+  split.by <- split.by[1]
+  if (!is.null(split.by)) {
+    theme <- theme + theme_facet()
+    facet.args[['nrow']] <- 1
+    facet.args[['ncol']] <- NULL
+    ncol <- 1
+  }
+
+  pt.alpha <- pt.alpha %||% 1
+
+  features <- rownames(feature.data)
+  feature.data <- t(feature.data[, rownames(object), drop = FALSE])
+  plist <- list()
+  for (i in features) {
+    data <- object[, c("x", "y")]
+    data[, 'colour'] <- feature.data[, i]
+    labs.args[['title']] <- i
+    if (!is.null(split.by)) {
+      data[, 'split'] <- object[, split.by]
+    }
+    if (isTRUE(order)) {
+      data <- data[order(data[['colour']]), , drop = FALSE]
+    }
+    plist[[i]] <- single_dim_plot(
+      data = data,
+      colors = colors,
+      pt.size = pt.size,
+      raster = raster,
+      raster.dpi = raster.dpi,
+      facet.args = facet.args,
+      labs.args = labs.args,
+      theme = theme,
+      corner.axis = corner.axis,
+      alpha = pt.alpha,
+      ...
+    )
+  }
+  if (combine) {
+    ncol <- min(ncol, length(plist))
+    plist <- wrap_plots(plist, ncol = ncol)
+  }
+  plist
+}
+
+#' @export
+#' @method feature_dim_plot Seurat
+feature_dim_plot.Seurat <- function(
+    object,
+    features,
+    reduction = NULL,
+    dims = c(1, 2),
+    cells = NULL,
+
+    assay = NULL,
+    slot = "data",
+
+    split.by = NULL,
+    ncol = NULL,
+    key = NULL,
+
+    order = NULL,
+    shuffle = FALSE,
+    seed = 42,
+    combine = TRUE,
+
+    colors = NULL,
+    pt.size = NULL,
+    pt.alpha = NULL,
+    raster = NULL,
+    raster.dpi = c(512, 512),
+    facet.args = list(),
+    corner.axis = FALSE,
+    theme = NULL,
+    ...
+) {
+  reduction <- reduction %||% DefaultDimReduc(object)
+  reduc.obj <- object[[reduction]]
+  assay <- assay %||% DefaultAssay(object)
+  DefaultAssay(object) <- assay
+
+  cells <- cells %||% Cells(object, assay = DefaultAssay(reduc.obj))
+  data <- FetchData(
+    object,
+    vars = paste0(Key(reduc.obj), dims),
+    cells = cells,
+    clean = "project"
+  )
+  key <- key %||% Key(reduc.obj)
+
+  if (!is.null(split.by)) {
+    split.by <- split.by[1]
+    split <- FetchData(object, vars = split.by, clean = TRUE)[split.by]
+    data <- data[rownames(split), ]
+    data[, split.by] <- split
+  }
+  feature.data <- as.matrix(FetchData(object, vars = features, cells = cells))
+  feature_dim_plot(
+    object = data,
+    feature.data = t(feature.data),
+
+    split.by = split.by,
+
+    dims = dims,
+    ncol = ncol,
+    key = key,
+
+    order = order,
+    shuffle = shuffle,
+    seed = seed,
+    combine = combine,
+
+    colors = colors,
+    pt.size = pt.size,
+    pt.alpha = pt.alpha,
+    raster = raster,
+    raster.dpi = raster.dpi,
+    facet.args = facet.args,
+    corner.axis = corner.axis,
     theme = theme,
     ...
   )
@@ -236,7 +427,7 @@ dot_plot <- function(object, ...) {
 }
 
 #' @importFrom ggplot2 facet_grid
-#' @importFrom Eula.utils bar_theme_default single_dot_plot
+#' @importFrom Eula.utils theme_dot_default single_dot_plot
 #' @export
 #' @method dot_plot CsparseMatrix
 dot_plot.CsparseMatrix <- function(
@@ -309,7 +500,7 @@ dot_plot.CsparseMatrix <- function(
     size = "Expressed percentage",
     color = "Average Expression"
   )
-  theme <- theme %||% bar_theme_default()
+  theme <- theme %||% theme_dot_default()
   p <- single_dot_plot(
     data = df,
     colors = colors,
@@ -524,18 +715,6 @@ dot_plot.Seurat <- function(
   df
 }
 
-#' @importFrom ggplot2 element_blank element_text theme
-#' @export
-theme_facet <- function(...) {
-  theme(
-    strip.background = element_blank(),
-    strip.text = element_text(size = 12),
-    validate = TRUE,
-    ...
-  )
-}
 
-#' @export
-theme_no_legend <- function(...) {
-  theme(legend.position = "none", validate = TRUE, ...)
-}
+
+
