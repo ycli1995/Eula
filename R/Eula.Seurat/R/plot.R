@@ -292,7 +292,7 @@ feature_dim_plot.data.frame <- function(
   labs.args[['colour']] <- "Exp"
 
   colors <- colors %||% c(
-    "#FFF7EC", "#FEE8C8", "#FDD49E", "#FDBB84", "#FC8D59",
+    "lightgrey", "#FEE8C8", "#FDD49E", "#FDBB84", "#FC8D59",
     "#EF6548", "#D7301F", "#B30000", "#7F0000"
   )
   theme <- theme %||% theme_dim_default()

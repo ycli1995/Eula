@@ -5,8 +5,6 @@
 add_corner_axis <- function(
     plot,
     length = 0.2,
-    lab.size = 3.5,
-    fontface = 1,
     family = "Arial",
     clip = "off",
     ...
@@ -93,6 +91,3 @@ Eula_corner_axis <- function(
 .corner.axis.title.element <- element_text(
   color = "black"
 )
-
-
-
