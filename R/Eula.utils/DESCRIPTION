@@ -13,8 +13,8 @@ RoxygenNote: 7.3.3
 Imports: 
     circlize,
     dplyr,
-    extrafont,
     ggplot2,
+    magrittr,
     Matrix,
     qvalue,
     rlang,
@@ -23,10 +23,35 @@ Imports:
     yaml
 Suggests: 
     DESeq2,
+    extrafont,
+    extrafontdb,
     ggrastr,
     limma,
     MAST,
     randomcoloR,
+    Rttf2pt1,
     scattermore,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Collate: 
+    'verbose.R'
+    'check.R'
+    'colors.R'
+    'corner_axis.R'
+    'diff_exp.R'
+    'enrich.R'
+    'genes.R'
+    'grouping.R'
+    'matrix.R'
+    'packages.R'
+    'pipe.R'
+    'plot.R'
+    'pseudobulk.R'
+    'read_write.R'
+    'rename.R'
+    'stat.R'
+    'subset.R'
+    'theme.R'
+    'utils.R'
+    'zzz.R'
+

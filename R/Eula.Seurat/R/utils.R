@@ -1,9 +1,19 @@
+#' @include old.R
+NULL
 
+#' @importFrom Eula.utils readRDX
+#' @importFrom SeuratObject UpdateSeuratObject
 #' @export
 Load <- function(file) {
-  object <- Eula.utils::Load(file)
+  object <- Eula.utils::readRDX(file)
   if (!is(object, "Seurat")) {
     return(object)
+  }
+  if (!"version" %in% slotNames(object)) {
+    return(object)
+  }
+  if (grepl('^2', object@version)) {
+    return(SeuratObject::UpdateSeuratObject(object))
   }
   CheckMySeuratObj(object)
 }
@@ -303,17 +313,19 @@ CellCycle.Seurat <- function(
   object
 }
 
-#' @importFrom SeuratObject FetchData
 #' @importFrom Eula.utils validCharacters
+#' @importFrom SeuratObject FetchData
+#' @importFrom dplyr mutate rename
+#' @importFrom tidyselect all_of
 #' @export
 FetchSeuratData <- function(object, vars, ...) {
-  new_names <- names(vars)
+  new.names <- names(vars)
   df <- FetchData(object, vars = vars, ...)
-  if (any(validCharacters(new_names))) {
-    vars <- vars[validCharacters(new_names)]
+  if (any(validCharacters(new.names))) {
+    vars <- vars[validCharacters(new.names)]
     vars <- vars[vars %in% colnames(df)]
     df <- df %>%
-      dplyr::rename(all_of(vars))
+      dplyr::rename(tidyselect::all_of(vars))
   }
   df <- df %>%
     dplyr::mutate(Cells = rownames(.), .before = 1) %>%
@@ -341,49 +353,7 @@ MergeFData <- function(object, assay = NULL) {
   object
 }
 
-#' @importFrom Eula.utils pseudobulkMatrix
-#' @export
-#' @method pseudobulkMatrix Seurat
-pseudobulkMatrix.Seurat <- function(
-    object,
-    group.by = NULL,
-    features = NULL,
-    assay = NULL,
-    slot = "data",
-    method = c("aggregate", "average"),
-    is.expm1 = NULL,
-    reverse = FALSE,
-    bulk = FALSE,
-    sparse = FALSE,
-    ...
-) {
-  assay <- assay %||% DefaultAssay(object)
-  is.expm1 <- is.expm1 %||% slot == "data"
-  group.by <- group.by %||% "ident"
-
-  if (Version(object) >= package_version("5.0.0")) {
-    object <- JoinLayers(object)
-  }
-  data <- GetAssayData(object[[assay]], slot)
-  if (!is.null(features)) {
-    data <- data[features, , drop = FALSE]
-  }
-  if (is.expm1) {
-    data <- expm1(data)
-  }
-  cell.groups <- FetchData(object, vars = group.by)
-  cell.groups <- Reduce(pasteFactors, cell.groups)
-  pseudobulkMatrix(
-    object = data,
-    cell.groups = cell.groups,
-    method = method,
-    reverse = reverse,
-    bulk = bulk,
-    sparse = sparse,
-    ...
-  )
-}
-
+#' @importFrom Matrix Diagonal
 #' @export
 RetrieveCounts <- function(mat, scale.factor = 10000) {
   nCounts <- apply(mat, 2, function(x) {
@@ -410,16 +380,19 @@ RetrieveCounts <- function(mat, scale.factor = 10000) {
     }
     return(round(x_min/ (expm1(exp1[1]) / scale.factor)))
   })
-  mat@x <- round(expm1(mat@x) / scale.factor * rep.int(nCounts, diff(mat@p)))
+  dd <- Matrix::Diagonal(x = 1 / scale.factor * nCounts, names = colnames(mat))
+  mat <- round(expm1(mat) %*% dd)
   mat
 }
 
+#' @importFrom SeuratObject Assays DefaultAssay DefaultAssay<-
 #' @export
 ShrinkSeuratObject <- function(
     object,
     assays = NULL,
     scale.data = NULL,
     misc.counts = NULL,
+    verbose = TRUE,
     ...
 ) {
   assays <- assays %||% SeuratObject::Assays(object)
@@ -427,7 +400,7 @@ ShrinkSeuratObject <- function(
   misc.counts <- misc.counts %||% TRUE
 
   if (!all(SeuratObject::Assays(object) %in% assays)) {
-    message("keep assays: ", paste(assays, collapse = ", "))
+    verboseMsg("keep assays: ", paste(assays, collapse = ", "))
     if (!DefaultAssay(object) %in% assays) {
       DefaultAssay(object) <- assays[1]
     }
@@ -435,7 +408,7 @@ ShrinkSeuratObject <- function(
   }
 
   if (!scale.data) {
-    message("remove 'scale.data' ")
+    verboseMsg("remove 'scale.data' ")
     if (packageVersion("Seurat") >= package_version("5.0.0")) {
       if (any(dim(SeuratObject::LayerData(object, layer = "scale.data")) > 0)) {
         SeuratObject::LayerData(object, layer = "scale.data") <- NULL

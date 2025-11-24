@@ -1,3 +1,5 @@
+#' @include verbose.R
+NULL
 
 #' @export
 #' @concept data
@@ -40,6 +42,7 @@ differExp.CsparseMatrix <- function(
     seed = 42,
     latent.vars = NULL,
     densify = FALSE,
+    verbose = TRUE,
     ...
 ) {
   .validate_cell_groups(
@@ -63,7 +66,8 @@ differExp.CsparseMatrix <- function(
     mean.fxn = mean.fxn,
     min.exp = min.exp,
     pseudocount.use = pseudocount.use,
-    base = base
+    base = base,
+    verbose = verbose
   )
   fc.results2 <- selectDE(
     fc.results = fc.results,
@@ -72,7 +76,8 @@ differExp.CsparseMatrix <- function(
     min.pct = min.pct,
     min.diff.pct = min.diff.pct,
     min.cells.feature = min.cells.feature,
-    only.pos = only.pos
+    only.pos = only.pos,
+    verbose = verbose
   )
 
   # Actually perform the DE test
@@ -89,6 +94,7 @@ differExp.CsparseMatrix <- function(
     max.cells.per.ident = max.cells.per.ident,
     latent.vars = latent.vars,
     densify = densify,
+    verbose = verbose,
     ...
   )
   de.results <- cbind(
@@ -107,6 +113,7 @@ differExp.CsparseMatrix <- function(
   )
   if (filter.nosig) {
     de.results <- de.results[de.results$significance != "nosig", , drop = FALSE]
+    verboseMsg("Keep ", nrow(de.results), " significant features")
   }
   if (nrow(de.results) == 0) {
     fastWarning("No DE features detected.")
@@ -217,9 +224,7 @@ selectDE <- function(
       "only.pos = ", only.pos
     )
   }
-  if (verbose) {
-    message("Select ", length(features), " features")
-  }
+  verboseMsg("Select ", length(features), " features")
   fc.results[features, , drop = FALSE]
 }
 
@@ -244,6 +249,7 @@ testDE.CsparseMatrix <- function(
     max.cells.per.ident = Inf,
     seed = 42,
     densify = FALSE,
+    verbose = TRUE,
     ...
 ) {
   if (!(test.use %in% DE.METHODS$latent) && !is.null(latent.vars)) {
@@ -269,13 +275,19 @@ testDE.CsparseMatrix <- function(
     }
   }
   features <- features %||% rownames(object)
+  verboseMsg(
+    "Test ", length(features), " of ", nrow(object), " features ",
+    "with method '", test.use, "'"
+  )
   if (length(features) == 0) {
+    fastWarning("No feature tested. All features will be not significant.")
     de.results0$significance <- "nosig"
     return(de.results0)
   }
 
   # subsample cell groups if they are too large
   if (max.cells.per.ident < Inf) {
+    verboseMsg("downsample cells to ", max.cells.per.ident)
     if (length(cells.1) > max.cells.per.ident) {
       set.seed(seed)
       cells.1 <- sample(cells.1, size = max.cells.per.ident)
@@ -407,8 +419,10 @@ foldChange.CsparseMatrix <- function(
     min.exp = 0,
     pseudocount.use = 1,
     base = 2,
+    verbose = TRUE,
     ...
 ) {
+  verboseMsg("Calculating fold changes for ", nrow(object), " features.")
   out <- rowMeanPct(
     object = object,
     cell.groups = list(cells.1 = cells.1, cells.2 = cells.2),
@@ -445,6 +459,7 @@ foldChange.matrix <- function(
     min.exp = 0,
     pseudocount.use = 1,
     base = 2,
+    verbose = TRUE,
     ...
 ) {
   foldChange.CsparseMatrix(
@@ -455,6 +470,7 @@ foldChange.matrix <- function(
     min.exp = min.exp,
     pseudocount.use = pseudocount.use,
     base = base,
+    verbose = verbose,
     ...
   )
 }
@@ -724,7 +740,7 @@ differDESeq2.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
       return(future.apply::future_lapply)
     }
   }
-  return(lapply)
+  lapply
 }
 
 .get_sapply <- function() {
@@ -733,7 +749,7 @@ differDESeq2.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
       return(future.apply::future_sapply)
     }
   }
-  return(sapply)
+  sapply
 }
 
 .validate_cell_groups <- function(data.use, cells.1, cells.2, min.cells.group) {
@@ -766,5 +782,3 @@ differDESeq2.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
   }
   invisible(NULL)
 }
-
-

@@ -1,23 +1,25 @@
+#' @include verbose.R
+NULL
 
 #' @export
-asMatrix <- function(object, max.row = 1000) {
+asMatrix <- function(object, max.row = 1000, verbose = TRUE) {
   breaks <- 0:ceiling(nrow(object) / max.row) * max.row
-  k <- cut(1:nrow(object), breaks = breaks)
+  k <- cut(seq_len(nrow(object)), breaks = breaks)
   mat <- matrix(0, nrow(object), ncol(object), dimnames = dimnames(object))
   for (i in levels(k)) {
-    message("as.matrix : ", paste0(range(which(k == i)), collapse = "-") )
+    verboseMsg("as.matrix : ", paste0(range(which(k == i)), collapse = "-"))
     mat[which(k == i)] <- as.matrix(object[which(k == i), ])
   }
   mat
 }
 
 #' @export
-min_max <- function(x) {
+normMinMax <- function(x) {
   (x - min(x)) / (max(x) - min(x))
 }
 
 #' @export
-min_max_cut <- function(x, limits = NULL) {
+cutMinMax <- function(x, limits = NULL) {
   if (length(limits) != 2) {
     fastWarning("'limits' should be a 2-element numeric vector.")
     return(x)
@@ -27,11 +29,35 @@ min_max_cut <- function(x, limits = NULL) {
   x
 }
 
+#' @export rowExpMean
+rowExpMean <- function(object, ...) {
+  UseMethod("rowExpMean", object)
+}
+
+#' @importFrom Matrix rowMeans
+#' @importClassesFrom Matrix CsparseMatrix
+#' @export
+#' @method rowExpMean CsparseMatrix
+rowExpMean.CsparseMatrix <- function(object, log = FALSE, ...) {
+  if (log) {
+    return(log1p(Matrix::rowMeans(expm1(object), ...)))
+  }
+  Matrix::rowMeans(expm1(object), ...)
+}
+
+#' @export
+#' @method rowExpMean matrix
+rowExpMean.matrix <- function(object, log = FALSE, ...) {
+  rowExpMean.CsparseMatrix(object = object, log = log, ...)
+}
+
 #' @export rowMeanPct
 rowMeanPct <- function(object, ...) {
   UseMethod("rowMeanPct", object)
 }
 
+#' @importFrom Matrix rowSums
+#' @importClassesFrom Matrix CsparseMatrix
 #' @export
 #' @method rowMeanPct CsparseMatrix
 rowMeanPct.CsparseMatrix <- function(

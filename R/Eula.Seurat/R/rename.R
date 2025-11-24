@@ -6,6 +6,7 @@ recodeFactor.Seurat <- function(
     x, map, column,
     keep.orders = FALSE,
     set.ident = FALSE,
+    verbose = TRUE,
     ...
 ) {
   column = column[1]
@@ -14,10 +15,11 @@ recodeFactor.Seurat <- function(
     map = map,
     column = column,
     keep.orders = keep.orders,
+    verbose = verbose,
     ...
   )
   if (set.ident & column %in% colnames(x@meta.data)) {
-    message("Set new column '", column, "' to Idents(object)")
+    verboseMsg("Set new column '", column, "' to Idents(object)")
     Idents(x) <- column
   }
   return(x)
@@ -89,6 +91,7 @@ RenameSeurat <- function(
     misc.name = NULL,
     set.ident = FALSE,
     keep.orders = FALSE,
+    verbose = TRUE,
     ...
 ) {
   object %>%
@@ -96,7 +99,8 @@ RenameSeurat <- function(
       map = map,
       column = column,
       set.ident = set.ident,
-      keep.orders = keep.orders
+      keep.orders = keep.orders,
+      verbose = verbose
     ) %>%
     checkColorMap(
       column = column,
@@ -107,25 +111,15 @@ RenameSeurat <- function(
 }
 
 #' @export
-RenameSeuratColumns <- function(object, map = list()) {
-  Message('>>>>> Rename columns in obj@meta.data...')
+RenameSeuratColumns <- function(object, map = list(), verbose = TRUE) {
   for (i in names(map)) {
     if (map[[i]] %in% colnames(object@meta.data)) {
-      message("Reset object@meta.data: '", map[[i]], "' -> '", i, "'")
+      verboseMsg("Reset object@meta.data: '", map[[i]], "' -> '", i, "'")
       object@meta.data[, i] <- object@meta.data[, map[[i]]]
     }
   }
   return(object)
 }
-
-.COLOR_NAMES <- list(
-  "orig.ident" = "color.sample",
-  "Groups" = "color.group",
-  "seurat_clusters" = "color.cluster",
-  "Samples" = "color.sample",
-  "Cluster" = "color.cluster",
-  "Clusters" = "color.cluster"
-)
 
 #' @export
 RenameSeuratMetaData <- function(object, parameter = list()) {
@@ -167,15 +161,9 @@ RenameSeuratMetaData <- function(object, parameter = list()) {
   object
 }
 
-.METADATA_COLUMNS <- list(
-  "sample" = "orig.ident",
-  "group" = "Groups",
-  "cluster" = "seurat_clusters"
-)
-
 #' @export
 RenameSeuratWrapper <- function(object, parameter = list()) {
-  Message('>>>>> Rename Seurat...')
+  pipeMsg('>>>>> Rename Seurat...')
   print(str(object[[]]))
   print(str(object@misc))
   for (i in names(parameter)) {
@@ -187,6 +175,7 @@ RenameSeuratWrapper <- function(object, parameter = list()) {
   object
 }
 
+#' @importFrom Eula.utils writeTable
 #' @export
 WriteRenameConf <- function(
     object,
@@ -211,5 +200,3 @@ WriteRenameConf <- function(
   }
   invisible(NULL)
 }
-
-

@@ -1,6 +1,7 @@
 #' @importFrom SeuratObject Assays Cells Graphs Images
 NULL
 
+#' @importFrom Eula.utils getArgList
 get_cells_and_features <- function(
     object,
     cells = NULL,
@@ -10,10 +11,10 @@ get_cells_and_features <- function(
 ) {
   all_cells <- rownames(object[[]])
 
-  cells <- norm_list_param(cells)
-  features <- norm_list_param(features)
-  cells_exclude <- norm_list_param(cells_exclude)
-  features_exclude <- norm_list_param(features_exclude)
+  cells <- getArgList(cells)
+  features <- getArgList(features)
+  cells_exclude <- getArgList(cells_exclude)
+  features_exclude <- getArgList(features_exclude)
 
   if (length(cells) > 0) {
     all_cells <- intersect(all_cells, cells)

@@ -627,7 +627,7 @@ findAllMarkers <- function(
   for (i in seq_along(idents.all)) {
     ident <- idents.all[i]
     if (verbose) {
-      message("Calculating cluster ", ident)
+      message("\n>>>> Calculating cluster ", ident)
     }
     gde <- tryCatch(
       expr = {
@@ -774,7 +774,7 @@ findGroupDiffer <- function(
       cells.2 <- intersect(cells, rownames(group.data)[group.data[, diff[[2]]]])
 
       if (verbose) {
-        message("Calculating cluster ", cluster)
+        message("\n>>>> Calculating cluster ", cluster)
       }
       gde <- tryCatch(
         expr = {

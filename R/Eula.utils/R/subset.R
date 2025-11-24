@@ -1,3 +1,5 @@
+#' @include verbose.R
+NULL
 
 #' @export
 filterData <- function(x, ...) {
@@ -65,12 +67,13 @@ filterData.data.frame <- function(
     column,
     include = NULL,
     exclude = NULL,
+    verbose = TRUE,
     ...
 ) {
   if (!column %in% colnames(x)) {
     fastWarning("'", column, "' not found in data. No filtering.")
     return(rep.int(TRUE, nrow(x)))
   }
-  message("Filtering data by column '", column, "'.")
+  verboseMsg("Filtering data by column '", column, "'.")
   filterData(x = x[[column]], include = include, exclude = exclude)
 }

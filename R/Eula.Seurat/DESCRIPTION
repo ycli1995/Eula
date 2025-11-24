@@ -16,5 +16,22 @@ Imports:
     Eula.utils,
     reshape2,
     Seurat (>= 5.1.0),
-    SeuratObject (>= 5.1.0),
-    tidydr
+    SeuratObject (>= 5.1.0)
+Collate: 
+    'pipe.R'
+    'R_pipe.R'
+    'data_import.R'
+    'diff_exp.R'
+    'old.R'
+    'pipe_utils.R'
+    'plot.R'
+    'plot_pipe.R'
+    'pseudobulk.R'
+    'rename.R'
+    'stat.R'
+    'subset.R'
+    'utils.R'
+    'version.R'
+    'zzz.R'
+Suggests: 
+    future

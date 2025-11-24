@@ -1,3 +1,5 @@
+#' @include verbose.R
+NULL
 
 #' @export
 checkColumns <- function(x, cols) {
@@ -23,12 +25,12 @@ checkKeys <- function(x, keys) {
 }
 
 #' @export
-checkPackages <- function(pkgs, required = TRUE) {
-  for (i in pkgs) {
-    if (!requireNamespace(i, quietly = TRUE)) {
+checkPackages <- function(packages, required = TRUE, ...) {
+  for (i in packages) {
+    if (!requireNamespace(package = i, ..., quietly = TRUE)) {
       e <- sprintf("Please install package '%s' manually.", i)
       if (required) {
-        stop(e, call. = FALSE)
+        stop(e)
       }
       fastWarning(e)
     }

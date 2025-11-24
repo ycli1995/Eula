@@ -1,13 +1,11 @@
 
+#' @importFrom rlang %||%
+#' @importFrom vctrs %0%
 #' @keywords internal
 "_PACKAGE"
 
 #' @importFrom ggplot2 el_def register_theme_elements
 .onLoad <- function(libname, pkgname) {
-  suppressMessages(require("extrafont", quietly = TRUE))
-  suppressMessages(require("extrafontdb", quietly = TRUE))
-  suppressMessages(require("Rttf2pt1", quietly = TRUE))
-
   ggplot2::register_theme_elements(
     Eula.corner.axis.title = .corner.axis.title.element,
     Eula.corner.axis = .corner.axis.element,

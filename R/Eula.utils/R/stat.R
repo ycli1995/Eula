@@ -1,3 +1,5 @@
+#' @include verbose.R
+NULL
 
 #' @export statByGroups
 statByGroups <- function(x, ...) {
@@ -9,13 +11,13 @@ statByGroups <- function(x, ...) {
 statByGroups.data.frame <- function(
     x,
     group.by,
+    n.name = "Number",
     sum = NULL,
     sum.pfx = "Total ",
     mean = NULL,
     mean.pfx = "Mean ",
     median = NULL,
     median.pfx = "Median ",
-    n.name = "Number",
     add.total = "Total",
     add.pct = "Proportion",
     ...
@@ -43,7 +45,7 @@ statByGroups.data.frame <- function(
     )
   if (validCharacters(add.pct)) {
     stat <- stat %>%
-      ungroup() %>%
+      dplyr::ungroup() %>%
       mutate(
         across(all_of(n.name), ~ . / sum(.), .names = add.pct),
         .after = all_of(n.name)

@@ -64,7 +64,7 @@ pseudobulkMatrix.CsparseMatrix <- function(
   as.matrix(mat)
 }
 
-#' @importFrom Matrix sparse.model.matrix
+#' @importFrom Matrix colSums Diagonal sparse.model.matrix
 #' @export
 categoryMatrix <- function(
     labels,
@@ -87,7 +87,7 @@ categoryMatrix <- function(
   cat.mat <- sparse.model.matrix(~0 + labels)
   colnames(cat.mat) <- levels(labels)
   if (reverse) {
-    cat.mat <- as(1 - cat.mat, "CsparseMatrix")
+    cat.mat <- 1 - cat.mat
   }
   colsums <- Matrix::colSums(cat.mat)
   cat.mat <- cat.mat[, colsums > 0, drop = FALSE]
@@ -95,6 +95,5 @@ categoryMatrix <- function(
   if (method == "aggregate") {
     return(cat.mat)
   }
-  cat.mat@x <- cat.mat@x / rep.int(colsums, diff(cat.mat@p))
-  cat.mat
+  cat.mat %*% Matrix::Diagonal(x = 1 / colsums, names = colnames(cat.mat))
 }

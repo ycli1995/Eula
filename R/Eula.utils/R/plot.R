@@ -81,7 +81,7 @@ single_dot_plot <- function(
     ...
 ) {
   colors <- colors %||% c(
-    "#FFF7EC", "#FEE8C8", "#FDD49E", "#FDBB84", "#FC8D59",
+    "lightgrey", "#FEE8C8", "#FDD49E", "#FDBB84", "#FC8D59",
     "#EF6548", "#D7301F", "#B30000", "#7F0000"
   )
   cols.required <- c("x", "y", "colour", "size")
@@ -139,7 +139,7 @@ single_dim_plot <- function(
     raster <- FALSE
   }
 
-  pt.size <- pt.size %||% auto_point_size(data, raster)
+  pt.size <- auto_point_size(data, pt.size = pt.size, raster = raster)
 
   cols.required <- c("x", "y")
   cols.optional <- c("colour", "size", "alpha")
@@ -234,8 +234,8 @@ get_mapping_from_data <- function(data, cols) {
     data[['colour']] <- data[["color"]]
     data[['color']] <- NULL
   }
-  mapping <- aes()
-  data <- data[, intersect(colnames(data), cols)]
+  mapping <- ggplot2::aes()
+  data <- data[, intersect(colnames(data), cols), drop = FALSE]
   for (i in colnames(data)) {
     mapping[[i]] <- as.symbol(i)
   }
@@ -264,6 +264,8 @@ add_labels <- function(data, repel = TRUE, box = FALSE, ...) {
   add_my_facet(p = p, facets = ~split, args = args, ...)
 }
 
+#' @importFrom dplyr across group_by summarize
+#' @importFrom tidyselect all_of
 #' @export
 get_label_data <- function(data, group.by = NULL, ...) {
   group.by <- group.by %||% "colour"
@@ -273,7 +275,7 @@ get_label_data <- function(data, group.by = NULL, ...) {
     stop("No valid 'group.by' for summarizing the label positions.")
   }
   label.data <- data %>%
-    dplyr::group_by(across(all_of(group.by))) %>%
+    dplyr::group_by(dplyr::across(tidyselect::all_of(group.by))) %>%
     dplyr::summarize(x = median(x), y = median(y))
   label.data$label <- label.data[[group.by[1]]]
   label.data
@@ -281,7 +283,7 @@ get_label_data <- function(data, group.by = NULL, ...) {
 
 #' @importFrom ggplot2 facet_wrap
 add_my_facet <- function(p, facets, args = list(), ...) {
-  fw <- facet_wrap(facets = facets)
+  fw <- ggplot2::facet_wrap(facets = facets)
   use.args <- intersect(names(args), names(fw$params))
   for (i in use.args) {
     fw$params[[i]] <- args[[i]]
@@ -295,7 +297,7 @@ add_my_labs <- function(p, args = list(), ...) {
   if (length(args) == 0) {
     return(p)
   }
-  my.labs <- labs()
+  my.labs <- ggplot2::labs()
   for (i in names(args)) {
     my.labs[[i]] <- args[[i]]
   }
@@ -311,7 +313,7 @@ add_my_theme <- function(p, args = list(), ...) {
   if (is(args, "ggplot2::theme")) {
     return(p + args)
   }
-  my.theme <- theme()
+  my.theme <- ggplot2::theme()
   for (i in seq_along(args)) {
     my.theme[[i]] <- args[[i]]
   }
@@ -319,8 +321,9 @@ add_my_theme <- function(p, args = list(), ...) {
 }
 
 #' @export
-auto_point_size <- function(data, raster = NULL) {
-  ifelse(isTRUE(raster), 1, min(1, 1583 / nrow(data)))
+auto_point_size <- function(data, pt.size = NULL, raster = NULL) {
+  pt.size <- pt.size %||% 1
+  ifelse(isTRUE(raster), pt.size, min(pt.size, 1583 / nrow(data)))
 }
 
 #' @importFrom ggplot2 guides guide_legend
@@ -328,8 +331,11 @@ auto_point_size <- function(data, raster = NULL) {
 dim_plot_guides <- function(...) {
   args <- list(...)
   if ("colour" %in% names(args) | "color" %in% names(args)) {
-    return(guides(...))
+    return(ggplot2::guides(...))
   }
-  guides(colour = guide_legend(override.aes = list(size = 3, alpha = 1)), ...)
+  ggplot2::guides(
+    colour = ggplot2::guide_legend(override.aes = list(size = 3, alpha = 1)),
+    ...
+  )
 }
 

@@ -111,8 +111,14 @@ theme_dot_default <- function(family = "Arial", ...) {
 
 #' @importFrom ggplot2 get_last_plot ggsave
 #' @importFrom grDevices cairo_pdf
+#' @importFrom tools file_ext
 #' @export
 ggsave2 <- function(filename, plot = get_last_plot(), device = NULL, ...) {
+  if (requireNamespace("extrafont", quietly = TRUE)) {
+    suppressMessages(require("extrafont", quietly = TRUE))
+    suppressMessages(require("extrafontdb", quietly = TRUE))
+    suppressMessages(require("Rttf2pt1", quietly = TRUE))
+  }
   ext <- tools::file_ext(filename)
   if (tolower(ext) == "pdf") {
     device <- device %||% cairo_pdf

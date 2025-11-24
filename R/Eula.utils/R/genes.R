@@ -1,3 +1,5 @@
+#' @include check.R
+NULL
 
 #' @export getFeaturesID
 getFeaturesID <- function(object, features, ...) {

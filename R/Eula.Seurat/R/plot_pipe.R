@@ -1,14 +1,23 @@
-#' @importFrom Eula.utils ggsave2
+#' @importFrom Eula.utils captureMsg getArgList getDefaultArgs ggsave2 pipeMsg
 NULL
 
 #' @importFrom SeuratObject Reductions
 #' @export
-pipe_DimPlot <- function(obj, params = list(), ...) {
-  params[['outdir']] <- params[['outdir']] %||% getwd()
-  params[['basic.size']] <- params[['basic.size']] %||% 5.5
-  params[['reductions']] <- params[['reductions']] %||% c("umap", "tsne")
-  params[['corner.axis']] <- params[['corner.axis']] %||% TRUE
+pipe_dim_plot <- function(obj, params = list(), pipe.name = NULL, ...) {
+  pipe.name <- c(pipe.name, "dim_plot")
+  pipeMsg("Start")
 
+  defaults <- list(
+    outdir = getwd(),
+    basic.size = 5.5,
+    reductions = c("umap", "tsne"),
+    corner.axis = TRUE,
+    group.by = NULL,
+    split.by = NULL,
+    label = NULL,
+    legend = NULL
+  )
+  params <- getDefaultArgs(defaults, params)
   print(str(params))
   list2env(params, envir = environment())
 
@@ -16,13 +25,7 @@ pipe_DimPlot <- function(obj, params = list(), ...) {
   if (length(reductions) == 0) {
     stop("No valid reduction in the Seurat object.")
   }
-
-  group.by <- params[['group.by']]
-  split.by <- params[['split.by']]
-  label <- params[['label']]
-  legend <- params[['legend']]
-
-  save_multi_DimPlot(
+  save_multi_dim_plot(
     obj,
     outdir = outdir,
     basic.size = basic.size,
@@ -36,13 +39,53 @@ pipe_DimPlot <- function(obj, params = list(), ...) {
   )
 }
 
-#' @importFrom Eula.utils norm_fname
+
+#' @export
+pipe_dot_plot <- function(obj, params = list(), ...) {
+  defaults <- list(
+    outdir = getwd(),
+    group.by = NULL,
+    split.by = NULL,
+    assay = NULL,
+    theme = NULL,
+    min.exp = 0,
+    scale = TRUE,
+    color.limits = c(-2.5, 2.5),
+    size.limits = c(0, 100),
+    coord.flip = FALSE
+  )
+  params <- fetch_default_params(defaults, params)
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+
+  features <- getArgList(params[['features']])
+
+  save_multi_dot_plot(
+    obj = obj,
+    features = features,
+    outdir = outdir,
+    assay = assay,
+    group.by = group.by,
+    split.by = split.by,
+    split.features = split.features,
+    min.exp = min.exp,
+    scale = scale,
+    colors = colors,
+    color.limits = color.limits,
+    size.limits = size.limits,
+    coord.flip = coord.flip,
+    theme = theme,
+    ...
+  )
+}
+
+#' @importFrom Eula.utils normalizeFileName
 #' @importFrom Seurat SplitObject
 #' @export
-save_multi_DimPlot <- function(
+save_dim_plots <- function(
     obj,
     outdir = getwd(),
-    basic.size = 6,
+    basic.size = 5.5,
     reductions = "umap",
     group.by = NULL,
     split.by = NULL,
@@ -51,9 +94,9 @@ save_multi_DimPlot <- function(
   split.by <- split.by[1]
   for (reduc in reductions) {
     outfile <- paste(reduc, paste(group.by, collapse = "."), "pdf", sep = ".")
-    save_DimPlot(
+    save_dim_plot(
       obj = obj,
-      outfile = file.path(outdir, norm_fname(outfile)),
+      outfile = file.path(outdir, normalizeFileName(outfile)),
       basic.size = basic.size,
       reduction = reduc,
       group.by = group.by,
@@ -67,9 +110,9 @@ save_multi_DimPlot <- function(
   for (j in names(obj.list)) {
     for (reduc in reductions) {
       outfile <- paste(c(reduc, group.by, j, "pdf"), collapse = ".")
-      save_DimPlot(
+      save_dim_plot(
         obj = obj.list[[j]],
-        outfile = file.path(outdir, norm_fname(outfile)),
+        outfile = file.path(outdir, normalizeFileName(outfile)),
         basic.size = basic.size,
         reduction = reduc,
         group.by = group.by,
@@ -80,10 +123,92 @@ save_multi_DimPlot <- function(
   invisible(NULL)
 }
 
-#' @importFrom ggplot2 ggsave
-#' @importFrom tidydr theme_dr
+#' @importFrom Eula.utils normalizeFileName
+#' @importFrom Seurat SplitObject
 #' @export
-save_DimPlot <- function(
+save_feature_dim_plots <- function(
+    obj,
+    features,
+    outdir = getwd(),
+    basic.size = 5.5,
+    reductions = "umap",
+    combine = TRUE,
+    split.by = NULL,
+    order = NULL,
+    ...
+) {
+  if (combine) {
+    features <- list(combine = features)
+  } else {
+    features <- getFeaturesID(obj, features)
+    features <- getFeaturesName(obj, features, "unique_name")
+    names(features) <- features
+  }
+  split.by <- split.by[1]
+  obj.list <- list()
+  if (length(split.by) > 0) {
+    obj.list <- SplitObject(obj, split.by = split.by)
+  }
+  for (reduc in reductions) {
+    for (i in seq_along(features)) {
+      fname <- names(features)[i]
+      outfile <- paste(reduc, fname, "pdf", sep = ".")
+      save_feature_dim_plot(
+        obj = obj,
+        features = features[[i]],
+        outfile = file.path(outdir, normalizeFileName(outfile)),
+        basic.size = basic.size,
+        reduction = reduc,
+        combine = combine,
+        order = order,
+        ...
+      )
+      for (j in seq_along(obj.list)) {
+        nm <- gsub("\\/| ", "_", names(obj.list)[j])
+        outfile <- paste(reduc, fname, nm, "pdf", sep = ".")
+        save_feature_dim_plot(
+          obj = obj.list[[j]],
+          features = features[[i]],
+          outfile = file.path(outdir, normalizeFileName(outfile)),
+          basic.size = basic.size,
+          reduction = reduc,
+          combine = combine,
+          order = order,
+          ...
+        )
+      }
+    }
+  }
+  invisible(NULL)
+}
+
+#' @importFrom Eula.utils normalizeFileName
+#' @export
+save_dot_plots <- function(
+    obj,
+    features,
+    outdir = getwd(),
+    group.by = NULL,
+    split.by = NULL,
+    ...
+) {
+  group.by <- group.by %0% "Idents"
+  for (g in group.by) {
+    outfile <- paste("dot_plot", g, "pdf", sep = ".")
+    save_dot_plot(
+      obj = obj,
+      features = features,
+      outfile = file.path(outdir, normalizeFileName(outfile)),
+      group.by = g,
+      split.by = split.by,
+      ...
+    )
+  }
+  invisible(NULL)
+}
+
+#' @export
+save_dim_plot <- function(
     obj,
     outfile = NULL,
     basic.size = 5.5,
@@ -144,72 +269,78 @@ save_DimPlot <- function(
   invisible(NULL)
 }
 
+#' @importFrom ggplot2 labs
 #' @export
-pipe_DotPlot <- function(obj, params = list(), ...) {
-  defaults <- list(
-    outdir = getwd(),
-    group.by = NULL,
-    split.by = NULL,
+save_feature_dim_plot <- function(
+    obj,
+    features,
+    outfile = NULL,
+    basic.size = 5.5,
+    reduction = NULL,
+    dims = c(1, 2),
     assay = NULL,
+    slot = "data",
+    ncol = NULL,
+    order = NULL,
+    shuffle = FALSE,
+    seed = 42,
+    combine = TRUE,
+    colors = NULL,
+    pt.size = NULL,
+    pt.alpha = NULL,
+    raster = NULL,
+    corner.axis = FALSE,
     theme = NULL,
-    min.exp = 0,
-    scale = TRUE,
-    color.limits = c(-2.5, 2.5),
-    size.limits = c(0, 100),
-    coord.flip = FALSE
-  )
-  params <- fetch_default_params(defaults, params)
-  capture.msg(str(params))
-  list2env(params, envir = environment())
-
-  features <- norm_list_param(params[['features']])
-
-  save_multi_DotPlot(
-    obj = obj,
+    ...
+) {
+  features <- getFeaturesID(obj, features)
+  p <- feature_dim_plot(
+    object = obj,
     features = features,
-    outdir = outdir,
+    reduction = reduction,
+    dims = dims,
     assay = assay,
-    group.by = group.by,
-    split.by = split.by,
-    split.features = split.features,
-    min.exp = min.exp,
-    scale = scale,
+    slot = slot,
+    split.by = NULL,
+    ncol = NULL,
+    order = order,
+    shuffle = shuffle,
+    seed = seed,
+    combine = FALSE,
     colors = colors,
-    color.limits = color.limits,
-    size.limits = size.limits,
-    coord.flip = coord.flip,
+    pt.size = pt.size,
+    pt.alpha = pt.alpha,
+    raster = raster,
+    corner.axis = corner.axis,
     theme = theme,
     ...
   )
-}
-
-#' @importFrom Eula.utils norm_fname
-#' @export
-save_multi_DotPlot <- function(
-    obj,
-    features,
-    outdir = getwd(),
-    group.by = NULL,
-    split.by = NULL,
-    ...
-) {
-  group.by <- group.by %0% "Idents"
-  for (g in group.by) {
-    outfile <- paste("DotPlot", g, "pdf", sep = ".")
-    save_DotPlot(
-      obj = obj,
-      features = features,
-      outfile = file.path(outdir, norm_fname(outfile)),
-      group.by = g,
-      split.by = split.by,
-      ...
-    )
+  names(p) <- getFeaturesName(obj, features, "unique_name")
+  for (i in seq_along(p)) {
+    p[[i]] <- p[[i]] + labs(title = names(p)[i])
   }
+  if (is.null(outfile)) {
+    return(p)
+  }
+  ncol <- ncol %||% min(ceiling(sqrt(length(features))), 5)
+  if (length(p) == 1) {
+    ncol <- 1
+    p <- p[[1]]
+  } else {
+    p <- wrap_plots(p, ncol = ncol)
+  }
+  nrow <- ceiling(length(features) / ncol)
+  w <- basic.size * (6/5) * ncol
+  h <- basic.size * nrow
+  ggsave2(outfile, p, width = w, height = h, limitsize = FALSE)
   invisible(NULL)
 }
 
+
+
+
 #' @export
-save_DotPlot <- function(
+save_dot_plot <- function(
     obj,
     features,
     outfile = NULL,

@@ -427,7 +427,7 @@ dot_plot <- function(object, ...) {
 }
 
 #' @importFrom ggplot2 facet_grid
-#' @importFrom Eula.utils theme_dot_default single_dot_plot
+#' @importFrom Eula.utils cutMinMax theme_dot_default single_dot_plot
 #' @export
 #' @method dot_plot CsparseMatrix
 dot_plot.CsparseMatrix <- function(
@@ -491,7 +491,7 @@ dot_plot.CsparseMatrix <- function(
     df$colour <- df$avg.exp
   }
   if (length(color.limits) == 2) {
-    df$colour <- min_max_cut(df$colour, limits = color.limits)
+    df$colour <- cutMinMax(df$colour, limits = color.limits)
   }
   df$size <- df$avg.pct * 100
   labs.args <- list(

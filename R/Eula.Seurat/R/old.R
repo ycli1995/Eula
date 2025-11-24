@@ -1,7 +1,6 @@
 
 #' @export
 CheckMySeuratObj <- function(object, ...) {
-  Message('>>>>> Check Seurat extra information...')
   object <- CheckSeuratMetaData(object, ...)
   object <- CheckSeuratFData(object)
   object
@@ -14,7 +13,6 @@ CheckSeuratMetaData <- function(object, column.map = list(), ...) {
     Groups = c("group", "Samples"),
     Clusters = "seurat_clusters"
   )
-
   old.colors <- list(
     seurat_clusters = "color.cluster",
     orig.ident = "color.sample",
@@ -66,16 +64,16 @@ CheckSeuratMetaData <- function(object, column.map = list(), ...) {
   return(object)
 }
 
-ROW_DATA_NAMES <- c("id", "name", "unique_name", "merge_name")
+ROW.DATA.NAMES <- c("id", "name", "unique_name", "merge_name")
 
 #' @export
 CheckSeuratFData <- function(object) {
-  fdata <- AddUnderscore(object@misc$fdata)
-  if (is.null(fdata)) {
+  if (is.data.frame(object@misc$rowData)) {
+    checkColumns(object@misc$rowData, ROW.DATA.NAMES)
     return(object)
   }
-  if (is.data.frame(object@misc$rowData)) {
-    checkColumns(object@misc$rowData, ROW_DATA_NAMES)
+  fdata <- AddUnderscore(object@misc$fdata)
+  if (is.null(fdata)) {
     return(object)
   }
   object@misc$rowData <- data.frame(
@@ -100,7 +98,7 @@ FindFeaturesID <- function(object, features, unlist = TRUE) {
     f4 <- toupper(object@misc$fdata$underscore)
   }
   features <- sapply(features, function(x) {
-    if ( !exists("fdata", object@misc) ) return(NULL)
+    if (!exists("fdata", object@misc)) return(NULL)
     g1 <- f1 %in% toupper(x)
     if ( sum(g1) > 0 ) return(rownames(object@misc$fdata)[g1])
     g2 <- f2 %in% toupper(x)
@@ -116,16 +114,22 @@ FindFeaturesID <- function(object, features, unlist = TRUE) {
   return(features)
 }
 
-FindFeaturesName <- function(object, features, col = "merge_name", is.fast = FALSE) {
-  if ( ! exists("fdata", object@misc) )
+FindFeaturesName <- function(
+    object,
+    features,
+    col = "merge_name",
+    is.fast = FALSE
+) {
+  if (!exists("fdata", object@misc)) {
     return(features)
+  }
   object@misc$fdata <- AddUnderscore(object@misc$fdata)
   new <- gsub("_", "-", features)
-  if ( all(new %in% object@misc$fdata$dash) ) {
+  if (all(new %in% object@misc$fdata$dash)) {
     rownames(object@misc$fdata) <- object@misc$fdata$dash
     features <- new
   }
-  if ( is.fast ) {
+  if (is.fast) {
     Name <- object@misc$fdata[features, col]
     names(Name) <- features
     return(Name)
@@ -137,12 +141,13 @@ FindFeaturesName <- function(object, features, col = "merge_name", is.fast = FAL
   return(Name)
 }
 
-AddUnderscore <- function(data){
-  if (!is.null(data)) {
-    if ( ! exists("underscore", data) || ! exists("dash", data) ) {
-      data$underscore <- rownames(data)
-      data$dash <- gsub("_", "-", rownames(data))
-    }
+AddUnderscore <- function(data) {
+  if (is.null(data)) {
+    return(data)
   }
-  return(data)
+  if ( ! exists("underscore", data) || ! exists("dash", data) ) {
+    data$underscore <- rownames(data)
+    data$dash <- gsub("_", "-", rownames(data))
+  }
+  data
 }

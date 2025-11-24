@@ -25,38 +25,38 @@ runEnrich <- function(
     stop("'gene2term' must be a list: gene id -> term id")
   }
   genes <- unique(genes)
-  q_gene2term <- gene2term[genes]
-  q_gene2term <- q_gene2term[lengths(q_gene2term) > 0]
-  if (length(q_gene2term) == 0) {
+  q.gene2term <- gene2term[genes]
+  q.gene2term <- q.gene2term[lengths(q.gene2term) > 0]
+  if (length(q.gene2term) == 0) {
     message("No gene can be mapped to any term.")
     message("--> return NULL...")
     return(NULL)
   }
-  all_genes_in_term <- unique(unlist(term2gene))
+  all.genes.in.term <- unique(unlist(term2gene))
   if (is.null(bg.genes)) {
-    bg.genes <- all_genes_in_term
+    bg.genes <- all.genes.in.term
   } else {
     if (!is.character(bg.genes)) {
       stop("'bg.genes' must be a character vector or NULL.")
     }
     if (!force.background) {
-      bg.genes <- intersect(bg.genes, all_genes_in_term)
+      bg.genes <- intersect(bg.genes, all.genes.in.term)
     }
   }
-  q_gene2term_df <- data.frame(
-    gene_id = rep(names(q_gene2term), lengths(q_gene2term)),
-    term_id = unlist(q_gene2term)
+  q.gene2term_df <- data.frame(
+    gene.id = rep(names(q.gene2term), lengths(q.gene2term)),
+    term.id = unlist(q.gene2term)
   )
-  q_gene2term_df <- unique(q_gene2term_df)
+  q.gene2term_df <- unique(q.gene2term_df)
 
-  q_term2gene <- with(
-    q_gene2term_df,
-    split(as.character(gene_id), as.character(term_id))
+  q.term2gene <- with(
+    q.gene2term_df,
+    split(as.character(gene.id), as.character(term.id))
   )
-  q_term2gene <- lapply(q_term2gene, intersect, bg.genes)
-  q_terms <- names(q_term2gene)
+  q.term2gene <- lapply(q.term2gene, intersect, bg.genes)
+  q.terms <- names(q.term2gene)
 
-  term2gene <- term2gene[q_terms]
+  term2gene <- term2gene[q.terms]
   term2gene <- lapply(term2gene, intersect, bg.genes)
   term2gene <- .select_geneset_by_size(term2gene, min.size, max.size)
   if (length(term2gene) == 0) {
@@ -65,41 +65,41 @@ runEnrich <- function(
     return(NULL)
   }
 
-  q_term2gene <- q_term2gene[names(term2gene)]
-  fg_count <- lengths(q_term2gene)
-  bg_count <- lengths(term2gene)
-  n_bg.genes <- length(bg.genes)
-  n_fg_genes <- length(q_gene2term)
+  q.term2gene <- q.term2gene[names(term2gene)]
+  fg.count <- lengths(q.term2gene)
+  bg.count <- lengths(term2gene)
+  n.bg.genes <- length(bg.genes)
+  n.fg.genes <- length(q.gene2term)
   results <- data.frame(
-    term_id = names(q_term2gene),
+    term_id = names(q.term2gene),
     gene_ratio = if (return.math) {
-      fg_count / n_fg_genes
+      fg.count / n.fg.genes
     } else {
-      paste(fg_count, "/", n_fg_genes)
+      paste(fg.count, "/", n.fg.genes)
     },
     bg_ratio = if (return.math) {
-      bg_count / n_bg.genes
+      bg.count / n.bg.genes
     } else {
-      paste(bg_count, "/", n_bg.genes)
+      paste(bg.count, "/", n.bg.genes)
     },
-    fg_count = fg_count,
-    bg_count = bg_count,
-    genes = unlist(lapply(q_term2gene, paste, collapse = "/")),
-    p = phyper(
-      q = fg_count - 1,
-      m = bg_count,
-      n = n_bg.genes - bg_count,
-      k = n_fg_genes,
+    fg_count = fg.count,
+    bg_count = bg.count,
+    genes = unlist(lapply(q.term2gene, paste, collapse = "/")),
+    p_val = phyper(
+      q = fg.count - 1,
+      m = bg.count,
+      n = n.bg.genes - bg.count,
+      k = n.fg.genes,
       lower.tail = FALSE
     ),
     stringsAsFactors = FALSE
   )
-  results$p_adj <- p.adjust(results$p, method = p.adjust.method)
-  results$q <- tryCatch(
-    qvalue(p = results$p, lambda = 0.05, pi0.method = "bootstrap")$qvalues,
+  results$p_val_adj <- p.adjust(results$p_val, method = p.adjust.method)
+  results$q_val <- tryCatch(
+    qvalue(p = results$p_val, lambda = 0.05, pi0.method = "bootstrap")$qvalues,
     error = function(e) NA
   )
-  results[order(results$p), ]
+  results[order(results$p_val), ]
 }
 
 .select_geneset_by_size <- function(genesets, min.size, max.size) {

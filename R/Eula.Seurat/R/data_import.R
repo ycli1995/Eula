@@ -226,6 +226,7 @@ MergeObject <- function(object.list, ...) {
   object
 }
 
+#' @importFrom Eula.utils getArgList
 #' @importFrom SeuratObject AddMetaData
 #' @export
 StatFeatures <- function(
@@ -236,7 +237,7 @@ StatFeatures <- function(
     assay = NULL
 ) {
   assay <- assay %||% DefaultAssay(object)
-  features <- norm_list_param(features)
+  features <- getArgList(features)
   features <- getFeaturesID(object, features = features)
   features <- intersect(features, rownames(object[[assay]]))
   out <- Matrix::colSums(

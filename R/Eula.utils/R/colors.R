@@ -10,45 +10,44 @@ checkColorMap.default <- function(x, colors = NULL, ...) {
   if (!is.factor(x)) {
     x <- factor(x)
   }
-  all_levels <- levels(x)
+  all.levels <- levels(x)
   if (length(colors) == 0) {
     fastWarning(
       "'colors' is NULL. Calling 'setColors' for the following levels: \n  ",
-      paste(all_levels, collapse = ", ")
+      paste(all.levels, collapse = ", ")
     )
     return(setColors(x, ...))
   }
   if (length(names(colors)) == 0) {
-    color_names <- all_levels[1:min(length(all_levels), length(colors))]
+    color.names <- all.levels[1:min(length(all.levels), length(colors))]
     fastWarning(
       "No name in 'colors', set color names with:\n  ",
-      paste(color_names, collapse = ", ")
+      paste(color.names, collapse = ", ")
     )
-    names(colors) <- color_names
+    names(colors) <- color.names
   }
-  if (length(colors) < length(all_levels)) {
-    miss_levels <- setdiff(all_levels, names(colors))
+  if (length(colors) < length(all.levels)) {
+    miss.levels <- setdiff(all.levels, names(colors))
     fastWarning(
       "Calling 'setColors' since the following levels mapped to no color: \n  ",
-      paste(miss_levels, collapse = ", ")
+      paste(miss.levels, collapse = ", ")
     )
     colors0 <- setColors(x, ...)
     colors0[names(colors)] <- colors
     return(colors0)
   }
-  if (!all(all_levels %in% names(colors))) {
-    miss_levels <- setdiff(all_levels, names(colors))
+  if (!all(all.levels %in% names(colors))) {
+    miss.levels <- setdiff(all.levels, names(colors))
     fastWarning(
       "Calling 'setColors' since the following levels mapped to no color: \n  ",
-      paste(miss_levels, collapse = ", ")
+      paste(miss.levels, collapse = ", ")
     )
     colors0 <- setColors(x, ...)
     cmm.nm <- intersect(names(colors0), names(colors))
     colors0[cmm.nm] <- colors[cmm.nm]
     return(colors0)
   }
-  colors <- colors[all_levels]
-  return(colors)
+  colors[all.levels]
 }
 
 #' @export
@@ -71,29 +70,29 @@ setColors <- function(x, type = "tsne", tag = "set1", ...) {
   if (!is.factor(x)) {
     x <- as.factor(x)
   }
-  color <- fetch_color(n = nlevels(x), type = type, tag = tag, ...)
+  color <- fetchColors(n = nlevels(x), type = type, tag = tag, ...)
   names(color) <- levels(x)
   color
 }
 
 #' @export
-load_color_list <- function() {
+loadColorList <- function() {
   dir <- system.file("extdata", package = .packageName)
   readYAML(file.path(dir, "Colors.yml"))
 }
 
 #' @export
-fetch_color <- function(n = 0, type = NULL, tag = NULL, verbose = FALSE) {
+fetchColors <- function(n = 0, type = NULL, tag = NULL, verbose = FALSE) {
   if (!is.numeric(n)) {
     stop("'n' must be numeric.")
   }
-  color.list <- load_color_list()
+  color.list <- loadColorList()
   all.types <- c(names(color.list), "random")
   type <- type %||% all.types[1]
   type <- match.arg(type, all.types)
 
   if (type == "random") {
-    color.use <- fetch_random_color(n = n, usepalette = TRUE)
+    color.use <- fetchRandomColors(n = n, usepalette = TRUE)
     verboseMsg("color : ", type, "->", tag, "->", n)
     return(color.use)
   }
@@ -126,7 +125,7 @@ fetch_color <- function(n = 0, type = NULL, tag = NULL, verbose = FALSE) {
 }
 
 #' @export
-fetch_random_color <- function(
+fetchRandomColors <- function(
     n = 1,
     usepalette = FALSE,
     hue = " ",
