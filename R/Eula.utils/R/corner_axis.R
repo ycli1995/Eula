@@ -35,6 +35,7 @@ add_corner_axis <- function(
 }
 
 #' @importFrom ggplot2 CoordCartesian ggproto element_render
+#' @importFrom grid gList
 #' @export
 Eula_corner_axis <- function(
     length = 0.2,
@@ -45,16 +46,15 @@ Eula_corner_axis <- function(
     clip = "off",
     ...
 ) {
-  ggproto(
+  ggplot2::ggproto(
     NULL,
     CoordCartesian,
     limits = list(x = x.lim, y = y.lim),
     expand = TRUE,
     default = FALSE,
     clip = clip,
-
     render_fg = function(panel_params, theme) {
-      element_render(
+      g1 <- element_render(
         theme = theme,
         element = "Eula.corner.axis.title",
         label = c(x.lab, y.lab),
@@ -64,14 +64,13 @@ Eula_corner_axis <- function(
         hjust = c(0, 0),
         vjust = c(0, 0.5)
       )
-    },
-    render_bg = function(self, panel_params, theme) {
-      element_render(
+      g2 <- element_render(
         theme = theme,
         element = "Eula.corner.axis",
         x = unit(c(0.05 + length, 0.05, 0.05), "npc"),
         y = unit(c(0.05, 0.05, 0.05 + length), "npc")
       )
+      grid::gList(g1, g2)
     }
   )
 }
