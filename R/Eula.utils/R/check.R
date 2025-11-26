@@ -3,6 +3,9 @@ NULL
 
 #' @export
 checkColumns <- function(x, cols) {
+  if (length(cols) == 0) {
+    stop("No column to check.")
+  }
   if (!all(cols %in% colnames(x))) {
     cols <- paste(cols, collapse = ", ")
     stop("Missing columns for the input data:\n  ", cols)

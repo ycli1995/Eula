@@ -270,6 +270,7 @@ save_dim_plot <- function(
 }
 
 #' @importFrom ggplot2 labs
+#' @importFrom patchwork wrap_plots
 #' @export
 save_feature_dim_plot <- function(
     obj,
