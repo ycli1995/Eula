@@ -104,10 +104,10 @@ dim_plot.data.frame <- function(
     labs.args[["colour"]] <- i
 
     if (!is.null(split.by)) {
-      data[, 'split'] <- object[, split.by]
+      data[, 'split'] <- as.factor(object[, split.by])
     }
     if (!is.null(shape.by)) {
-      data[, 'shape'] <- object[, shape.by]
+      data[, 'shape'] <- as.factor(object[, shape.by])
     }
 
     if (isTRUE(order)) {
@@ -293,11 +293,12 @@ dot_plot.CsparseMatrix <- function(
     split.by = group.data$split.by,
     split.features = split.features
   )
-  df$x <- df$group.by
-  df$y <- df$features
   if (coord.flip) {
-    df$x <- df$features
-    df$y <- df$group.by
+    df[['x']] <- df$features
+    df[['y']] <- df$group.by
+  } else {
+    df[['x']] <- df$group.by
+    df[['y']] <- df$features
   }
   if (scale) {
     df$colour <- df$avg.scale.exp
@@ -371,6 +372,40 @@ dot_plot.CsparseMatrix <- function(
     return(p + facet.layer)
   }
   p
+}
+
+#' @export
+#' @method dot_plot matrix
+dot_plot.matrix <- function(
+    object,
+    group.by,
+    split.by = NULL,
+    split.features = NULL,
+    mean.fxn = NULL,
+    min.exp = 0,
+    scale = TRUE,
+    colors = NULL,
+    color.limits = c(-2.5, 2.5),
+    size.limits = c(0, 100),
+    coord.flip = FALSE,
+    theme = NULL,
+    ...
+) {
+  dot_plot.CsparseMatrix(
+    object = object,
+    group.by = group.by,
+    split.by = split.by,
+    split.features = split.features,
+    mean.fxn = mean.fxn,
+    min.exp = min.exp,
+    scale = scale,
+    colors = colors,
+    color.limits = color.limits,
+    size.limits = size.limits,
+    coord.flip = coord.flip,
+    theme = theme,
+    ...
+  )
 }
 
 #' @importFrom reshape2 melt
@@ -456,3 +491,117 @@ dot_plot.CsparseMatrix <- function(
   }
   df
 }
+
+#' @export violin_plot
+violin_plot <- function(object, ...) {
+  UseMethod("violin_plot")
+}
+
+#' @export
+#' @method violin_plot data.frame
+violin_plot.data.frame <- function(
+    object,
+    features,
+    group.by,
+    split.by = NULL,
+
+    combine = TRUE,
+    ncol = NULL,
+
+    colors = NULL,
+    noise.scale = 1e+5,
+    scale = "width",
+    adjust = 1,
+
+    box.width = 0,
+    box.color = "black",
+    box.dodge.width = 0.9,
+    pt.size = 0,
+    pt.alpha = 1,
+    jitter.width = 0.3,
+    jitter.dodge.width = 0.8,
+    raster = NULL,
+    raster.dpi = c(512, 512),
+    coord.flip = FALSE,
+    facet.args = list(),
+    labs.args = list(),
+    theme = NULL,
+    ...
+) {
+  checkColumns(object, features)
+
+  group.by <- group.by[1]
+  orig.groups <- group.by
+  group.by <- intersect(orig.groups, colnames(object))
+  if (length(group.by) == 0) {
+    stop("Invalid 'group.by':\n  ", paste(orig.groups, collapse = ", "))
+  }
+  object[[group.by]] <- as.factor(object[[group.by]])
+
+  labs.args[['x']] <- labs.args[['x']] %||% ""
+  labs.args[['y']] <- labs.args[['y']] %||% "Expression"
+
+  theme <- theme %||% theme_dot_default()
+  ncol <- ncol %||% 4
+  split.by <- split.by[1]
+  if (!is.null(split.by)) {
+    theme <- theme + theme_facet()
+    facet.args[['nrow']] <- 1
+    facet.args[['ncol']] <- NULL
+    ncol <- 1
+  }
+  plist <- list()
+  for (i in features) {
+    data <- object[, c(group.by, i)]
+
+    if (coord.flip) {
+      data[['x']] <- as.numeric(data[[i]])
+      data[['y']] <- data[[group.by]]
+      labs.args[c("x", "y")] <- labs.args[c("y", "x")]
+    } else {
+      data[['x']] <- data[[group.by]]
+      data[['y']] <- as.numeric(data[[i]])
+    }
+    data[, "colour"] <- data[[group.by]]
+    data[, "fill"] <- data[[group.by]]
+    if (!is.null(split.by)) {
+      data[, 'split'] <- object[, split.by]
+    }
+    if (isTRUE(order)) {
+      data <- data[order(data[[i]]), , drop = FALSE]
+    }
+    labs.args[['title']] <- i
+    plist[[i]] <- single_violin_plot(
+      data = data,
+      colors = NULL,
+      fills = colors,
+      fill.limits = NULL,
+      noise.scale = noise.scale,
+      scale = scale,
+      adjust = adjust,
+      box.width = box.width,
+      box.color = box.color,
+      box.dodge.width = box.dodge.width,
+      pt.size = pt.size,
+      pt.alpha = pt.alpha,
+      jitter.width = jitter.width,
+      jitter.dodge.width = jitter.dodge.width,
+      raster = raster,
+      raster.dpi = raster.dpi,
+      facet.args = facet.args,
+      labs.args = labs.args,
+      theme = theme,
+      ...
+    )
+  }
+  if (combine) {
+    ncol <- min(ncol, length(plist))
+    plist <- wrap_plots(plist, ncol = ncol)
+  }
+  plist
+}
+
+
+
+
+

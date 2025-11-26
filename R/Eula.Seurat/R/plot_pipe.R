@@ -337,9 +337,6 @@ save_feature_dim_plot <- function(
   invisible(NULL)
 }
 
-
-
-
 #' @export
 save_dot_plot <- function(
     obj,

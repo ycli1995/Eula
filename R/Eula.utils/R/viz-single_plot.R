@@ -1,6 +1,6 @@
 
-#' @importFrom ggplot2 geom_jitter geom_violin position_jitterdodge
-#' scale_fill_gradientn scale_fill_manual
+#' @importFrom ggplot2 geom_boxplot geom_jitter geom_violin position_dodge
+#' position_jitterdodge scale_fill_gradientn scale_fill_manual stat_summary
 #' @export
 single_violin_plot <- function(
     data,
@@ -10,8 +10,14 @@ single_violin_plot <- function(
     noise.scale = 1e+5,
     scale = "width",
     adjust = 1,
+    alpha = 1,
+    box.width = 0,
+    box.color = "black",
+    box.dodge.width = 0.9,
     pt.size = 0,
     pt.alpha = 1,
+    jitter.width = 0.3,
+    jitter.dodge.width = 0.8,
     raster = NULL,
     raster.dpi = c(512, 512),
     facet.args = list(),
@@ -20,33 +26,64 @@ single_violin_plot <- function(
     ...
 ) {
   cols.required <- c("x", "y")
-  cols.optional <- c("alpha")
+  cols.optional <- "fill"
+  violin.show.legend <- c(fill = TRUE)
+  if (alpha < 1) {
+    cols.optional <- c(cols.optional, "colour")
+    violin.show.legend <- c(violin.show.legend, colour = FALSE)
+  }
   data <- normalize_ggplot_data(data, cols = cols.required)
-  mapping <- get_mapping_from_data(data, cols = c(cols.required, cols.optional))
-
+  mapping0 <- get_mapping_from_data(data, cols = cols.required)
+  mapping <- get_mapping_from_data(data, cols = cols.optional)
   if (noise.scale > 0) {
     noise <- rnorm(nrow(data)) / noise.scale
-    data[['y']] <- data[['y']]
+    data[['y']] <- data[['y']] + noise
   }
-  p <- ggplot(data) +
+  p <- ggplot(data, mapping = mapping0) +
     geom_violin(
       mapping = mapping,
       scale = scale,
       adjust = adjust,
+      alpha = alpha,
+      show.legend = violin.show.legend,
       ...
     )
   if (pt.size > 0) {
     geom.jitter <- geom_jitter(
-      position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.9),
+      position = position_jitterdodge(
+        jitter.width = jitter.width,
+        dodge.width = jitter.dodge.width
+      ),
       size = pt.size,
       alpha = pt.alpha,
       show.legend = FALSE
     )
     if (isTRUE(raster)) {
       checkPackages("ggrastr")
-      geom.jitter <- ggrastr::rasterize(geom.jitter, dpi = raster.dpi)
+      raster.dpi <- raster.dpi[1]
+      geom.jitter <- ggrastr::rasterise(geom.jitter, dpi = raster.dpi)
     }
     p <- p + geom.jitter
+  }
+  if (box.width > 0) {
+    box.position <- position_dodge(width = box.dodge.width)
+    p <- p +
+      geom_boxplot(
+        position = box.position,
+        fill = box.color,
+        color = box.color,
+        width = box.width,
+        show.legend = FALSE,
+        outlier.shape = NA
+      ) +
+      stat_summary(
+        fun = median,
+        geom = "point",
+        position = box.position,
+        color = "white",
+        show.legend = FALSE,
+        size = 2.5
+      )
   }
   if ("colour" %in% colnames(data) & !is.null(colors)) {
     if (is.numeric(data$colour)) {
@@ -56,9 +93,9 @@ single_violin_plot <- function(
   }
   if ("fill" %in% colnames(data) & !is.null(fills)) {
     scale.fill <- if (is.numeric(data$fill)) {
-      scale_fill_gradientn(colors = colors, limits = fill.limits)
+      scale_fill_gradientn(colors = fills, limits = fill.limits)
     } else {
-      scale_fill_manual(values = colors)
+      scale_fill_manual(values = fills)
     }
     p <- p + scale.fill
   }
