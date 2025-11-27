@@ -39,7 +39,6 @@ pipe_dim_plot <- function(obj, params = list(), pipe.name = NULL, ...) {
   )
 }
 
-
 #' @export
 pipe_dot_plot <- function(obj, params = list(), ...) {
   defaults <- list(
@@ -54,7 +53,7 @@ pipe_dot_plot <- function(obj, params = list(), ...) {
     size.limits = c(0, 100),
     coord.flip = FALSE
   )
-  params <- fetch_default_params(defaults, params)
+  params <- getDefaultArgs(defaults, params)
   capture.msg(str(params))
   list2env(params, envir = environment())
 
@@ -74,6 +73,67 @@ pipe_dot_plot <- function(obj, params = list(), ...) {
     color.limits = color.limits,
     size.limits = size.limits,
     coord.flip = coord.flip,
+    theme = theme,
+    ...
+  )
+}
+
+#' @export
+pipe_violin_plot <- function(obj, params = list(), ...) {
+  defaults <- list(
+    outdir = getwd(),
+    basic.size = 4,
+    group.by = NULL,
+    combine = TRUE,
+    split.by = NULL,
+
+    noise.scale = 1e+5,
+    scale = "width",
+    adjust = 1,
+
+    box.width = 0,
+    box.color = "black",
+    box.dodge.width = 0.9,
+    pt.size = 0,
+    pt.alpha = 1,
+    jitter.width = 0.3,
+    jitter.dodge.width = 0.8,
+    raster = NULL,
+    raster.dpi = c(512, 512),
+    coord.flip = FALSE,
+    facet.args = list(),
+    theme = NULL
+  )
+  params <- getDefaultArgs(defaults, params)
+  capture.msg(str(params))
+  list2env(params, envir = environment())
+
+  features <- getArgList(params[['features']])
+
+  save_violin_plots(
+    obj = obj,
+    features = features,
+    outdir = outdir,
+    basic.size = basic.size,
+    group.by = group.by,
+    combine = combine,
+    split.by = split.by,
+
+    noise.scale = noise.scale,
+    scale = scale,
+    adjust = adjust,
+
+    box.width = box.width,
+    box.color = box.color,
+    box.dodge.width = box.dodge.width,
+    pt.size = pt.size,
+    pt.alpha = pt.alpha,
+    jitter.width = jitter.width,
+    jitter.dodge.width = jitter.dodge.width,
+    raster = raster,
+    raster.dpi = raster.dpi,
+    coord.flip = coord.flip,
+    facet.args = facet.args,
     theme = theme,
     ...
   )
@@ -159,7 +219,6 @@ save_feature_dim_plots <- function(
         outfile = file.path(outdir, normalizeFileName(outfile)),
         basic.size = basic.size,
         reduction = reduc,
-        combine = combine,
         order = order,
         ...
       )
@@ -172,8 +231,62 @@ save_feature_dim_plots <- function(
           outfile = file.path(outdir, normalizeFileName(outfile)),
           basic.size = basic.size,
           reduction = reduc,
-          combine = combine,
           order = order,
+          ...
+        )
+      }
+    }
+  }
+  invisible(NULL)
+}
+
+#' @importFrom Eula.utils normalizeFileName
+#' @importFrom Seurat SplitObject
+#' @export
+save_violin_plots <- function(
+    obj,
+    features,
+    outdir = getwd(),
+    basic.size = 4,
+    group.by = NULL,
+    combine = TRUE,
+    split.by = NULL,
+    ...
+) {
+  group.by <- group.by %||% "Idents"
+  if (combine) {
+    features <- list(combine = features)
+  } else {
+    features <- getFeaturesID(obj, features)
+    features <- getFeaturesName(obj, features, "unique_name")
+    names(features) <- features
+  }
+  split.by <- split.by[1]
+  obj.list <- list()
+  if (length(split.by) > 0) {
+    obj.list <- SplitObject(obj, split.by = split.by)
+  }
+  for (g in group.by) {
+    for (i in seq_along(features)) {
+      fname <- names(features)[i]
+      outfile <- paste(fname, g, "pdf", sep = ".")
+      save_violin_plot(
+        obj = obj,
+        features = features[[i]],
+        outfile = file.path(outdir, normalizeFileName(outfile)),
+        basic.size = basic.size,
+        group.by = g,
+        ...
+      )
+      for (j in seq_along(obj.list)) {
+        nm <- gsub("\\/| ", "_", names(obj.list)[j])
+        outfile <- paste(fname, g, nm, "pdf", sep = ".")
+        save_violin_plot(
+          obj = obj.list[[j]],
+          features = features[[i]],
+          outfile = file.path(outdir, normalizeFileName(outfile)),
+          basic.size = basic.size,
+          group.by = g,
           ...
         )
       }
@@ -269,6 +382,7 @@ save_dim_plot <- function(
   invisible(NULL)
 }
 
+#' @importFrom Eula.utils theme_no_legend
 #' @importFrom ggplot2 labs
 #' @importFrom patchwork wrap_plots
 #' @export
@@ -285,7 +399,6 @@ save_feature_dim_plot <- function(
     order = NULL,
     shuffle = FALSE,
     seed = 42,
-    combine = TRUE,
     colors = NULL,
     pt.size = NULL,
     pt.alpha = NULL,
@@ -333,6 +446,107 @@ save_feature_dim_plot <- function(
   nrow <- ceiling(length(features) / ncol)
   w <- basic.size * (6/5) * ncol
   h <- basic.size * nrow
+  ggsave2(outfile, p, width = w, height = h, limitsize = FALSE)
+  invisible(NULL)
+}
+
+#' @importFrom ggplot2 labs
+#' @importFrom patchwork wrap_plots
+#' @export
+save_violin_plot <- function(
+    obj,
+    features,
+    outfile = NULL,
+    basic.size = 4,
+    assay = NULL,
+    slot = "data",
+    ncol = NULL,
+    group.by = NULL,
+    cells = NULL,
+    combine = TRUE,
+
+    colors = NULL,
+    noise.scale = 1e+5,
+    scale = "width",
+    adjust = 1,
+
+    box.width = 0,
+    box.color = "black",
+    box.dodge.width = 0.9,
+    pt.size = 0,
+    pt.alpha = 1,
+    jitter.width = 0.3,
+    jitter.dodge.width = 0.8,
+    raster = NULL,
+    raster.dpi = c(512, 512),
+    coord.flip = FALSE,
+    facet.args = list(),
+    theme = NULL,
+    ...
+) {
+  group.by <- group.by[1] %0% "Idents"
+  if (identical(group.by, "Idents")) {
+    obj$Idents <- Idents(obj)
+  }
+  obj@meta.data <- droplevels(obj@meta.data)
+  obj <- checkColorMap(obj, group.by, obj@misc$colors[[group.by]])
+  colors <- colors %||% obj@misc$colors[[group.by]]
+
+  features <- getFeaturesID(obj, features)
+  p <- violin_plot(
+    object = obj,
+    features = features,
+    assay = assay,
+    slot = slot,
+    split.by = NULL,
+    ncol = NULL,
+    combine = FALSE,
+    colors = colors,
+    noise.scale = noise.scale,
+    scale = scale,
+    adjust = adjust,
+
+    box.width = box.width,
+    box.color = box.color,
+    box.dodge.width = box.dodge.width,
+    pt.size = pt.size,
+    pt.alpha = pt.alpha,
+    jitter.width = jitter.width,
+    jitter.dodge.width = jitter.dodge.width,
+    raster = raster,
+    raster.dpi = raster.dpi,
+    coord.flip = coord.flip,
+    facet.args = facet.args,
+    theme = theme,
+    ...
+  )
+  names(p) <- getFeaturesName(obj, features, "unique_name")
+  for (i in seq_along(p)) {
+    p[[i]] <- p[[i]] + labs(title = names(p)[i]) + theme_no_legend()
+  }
+  if (is.null(outfile)) {
+    return(p)
+  }
+  if (coord.flip) {
+    lab.size <- maxNChar(p[[1]]$data[["y"]]) * 0.08
+    w <- basic.size + lab.size + basic.size / 10
+    h <- length(unique(p[[1]]$data[["y"]])) * 0.25 + basic.size / 5
+  } else {
+    lab.size <- maxNChar(p[[1]]$data[["x"]]) * 0.08 * 2/3
+    h <- basic.size + lab.size + basic.size / 10
+    w <- length(unique(p[[1]]$data[["x"]])) * 0.25 + basic.size / 5
+  }
+  ncol <- ncol %||% min(ceiling(sqrt(length(features))), 5)
+  nrow <- ceiling(length(features) / ncol)
+  if (length(p) == 1) {
+    ncol <- 1
+    p <- p[[1]]
+  } else {
+    p <- wrap_plots(p, ncol = ncol)
+  }
+  message("Basic size: w = ", w, ", h = ", h)
+  w <- w * ncol
+  h <- h * nrow
   ggsave2(outfile, p, width = w, height = h, limitsize = FALSE)
   invisible(NULL)
 }

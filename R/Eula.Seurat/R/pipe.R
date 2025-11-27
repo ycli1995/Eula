@@ -992,6 +992,16 @@ pipe_PostFindAllMarkers <- function(
     coord.flip = coord.flip
   )
 
+  pipeMsg('Plotting violin_plot')
+  mkdir(file.path(outdir, "violin_plots"))
+  save_violin_plots(
+    obj,
+    features = features,
+    outdir = file.path(outdir, "violin_plots"),
+    combine = FALSE,
+    group.by = group.by
+  )
+
   pipeMsg('Plotting feature_dim_plot')
   mkdir(file.path(outdir, "feature_plots"))
   save_feature_dim_plots(

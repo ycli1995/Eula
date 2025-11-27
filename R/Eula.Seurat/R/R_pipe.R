@@ -126,7 +126,6 @@ pipe_FindAllMarkers_R <- function(params = list(), ...) {
 
   mkdir(outdir, chdir = TRUE)
   markers <- pipe_FindAllMarkers(obj, params[['FindAllMarkers']])
-
   markers <- pipe_PostFindAllMarkers(
     obj = obj,
     markers = markers,
