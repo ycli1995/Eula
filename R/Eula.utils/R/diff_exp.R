@@ -509,6 +509,17 @@ differWilcox.CsparseMatrix <- function(
   if (limma.check) {
     limma <- TRUE
   }
+  if (limma) {
+    tmp <- object[1, ]
+    overflow <- is.na(suppressWarnings(length(tmp) * length(tmp)))
+    if (overflow) {
+      fastWarning(
+        "Use 'limma' with ", ncol(object), " cells may cause overflow. ",
+        "Set 'limma = FALSE'."
+      )
+      limma <- FALSE
+    }
+  }
   if (!limma) {
     p_val <- my.sapply(seq_len(nrow(object)), function(i) {
       wilcox.test(object[i, ] ~ group.info[, "group"], ...)$p.value
@@ -524,11 +535,6 @@ differWilcox.CsparseMatrix <- function(
        BiocManager::install('limma')
        --------------------------------------------"
     )
-  }
-  tmp <- object[1, ]
-  overflow <- is.na(suppressWarnings(length(tmp) * length(tmp)))
-  if (overflow) {
-    stop("Use 'limma' with ", ncol(object), " cells may cause overflow.")
   }
   j <- seq_along(cells.1)
   p_val <- my.sapply(seq_len(nrow(object)), function(i) {

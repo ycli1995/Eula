@@ -50,7 +50,7 @@ CalAvgPct <- function(
 ) {
   assay <- assay %||% DefaultAssay(object)
   counts <- GetAssayData(object[[assay]], slot)
-  counts[counts > 0] <- 1
+  counts <- counts > 0
   object[[assay]] <- SetAssayData(object[[assay]], "counts", counts)
   out <- pseudobulkMatrix(
     object,
