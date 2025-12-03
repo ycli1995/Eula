@@ -45,8 +45,7 @@ dim_plot.Seurat <- function(
     cells = cells,
     features = NULL,
     group.by = group.by,
-    split.by = split.by,
-    shape.by = shape.by
+    extras = c(split.by, shape.by)
   )
   dim_plot(
     data,
@@ -126,8 +125,7 @@ feature_dim_plot.Seurat <- function(
     cells = cells,
     features = features,
     group.by = NULL,
-    split.by = split.by,
-    shape.by = NULL
+    extras = split.by[1]
   )
   feature_dim_plot(
     object = data,
@@ -188,8 +186,7 @@ dot_plot.Seurat <- function(
     assay = assay,
     features = features,
     group.by = group.by,
-    split.by = split.by,
-    shape.by = NULL
+    extras = split.by
   )
   group.data <- data[, setdiff(colnames(data), features), drop = FALSE]
   if (length(split.by) > 0) {
@@ -239,6 +236,7 @@ violin_plot.Seurat <- function(
     box.width = 0,
     box.color = "black",
     box.dodge.width = 0.9,
+    pt.group.by = NULL,
     pt.size = 0,
     pt.alpha = 1,
     jitter.width = 0.3,
@@ -258,9 +256,8 @@ violin_plot.Seurat <- function(
     reduction = NULL,
     cells = cells,
     features = features,
-    group.by = NULL,
-    split.by = split.by,
-    shape.by = NULL
+    group.by = group.by,
+    extras = c(split.by[1], pt.group.by)
   )
   group.by <- colnames(data)[1]
   violin_plot(
@@ -279,6 +276,7 @@ violin_plot.Seurat <- function(
     box.width = box.width,
     box.color = box.color,
     box.dodge.width = box.dodge.width,
+    pt.group.by = pt.group.by,
     pt.size = pt.size,
     pt.alpha = pt.alpha,
     jitter.width = jitter.width,
@@ -300,14 +298,11 @@ violin_plot.Seurat <- function(
     cells = NULL,
     features = NULL,
     group.by = NULL,
-    split.by = NULL,
-    shape.by = NULL
+    extras = NULL
 ) {
   assay <- assay %||% DefaultAssay(object)
   group.by <- group.by %||% "ident"
-  split.by <- split.by[1]
-  shape.by <- shape.by[1]
-  vars <- c(group.by, split.by, shape.by, features)
+  vars <- c(group.by, extras, features)
   if (!is.null(reduction)) {
     reduc.obj <- object[[reduction]]
     cells <- cells %||% Cells(object, assay = DefaultAssay(reduc.obj))

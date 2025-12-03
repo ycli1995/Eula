@@ -12,6 +12,12 @@ pipe_RenameObject <- function(obj, params = list(), pipe.name = NULL, ...) {
     params <- readYAML(file2)
   }
 
+  obj <- pipe_AddMetaData(
+    obj,
+    params = params[['AddMetaData']],
+    pipe.name = pipe.name
+  )
+
   pipeMsg('Rename columns in meta.data', pipe.name = pipe.name)
   obj <- RenameSeuratColumns(obj, params[['rename_colnames']])
 
@@ -30,7 +36,6 @@ pipe_RenameObject <- function(obj, params = list(), pipe.name = NULL, ...) {
   captureMsg(print(obj))
   captureMsg(str(obj@meta.data))
   captureMsg(print(obj@misc$colors))
-
 
   obj
 }
@@ -92,7 +97,6 @@ pipe_RenameSeuratMetaData <- function(
     keep.orders = keep.orders
   )
 
-
   obj
 }
 
@@ -117,6 +121,25 @@ pipe_RenameSeurat <- function(obj, params = list(), pipe.name = NULL, ...) {
     obj <- pipe_RenameSeuratMetaData(obj, params[[i]], pipe.name = pipe.name)
   }
 
+  obj
+}
+
+#' @importFrom SeuratObject AddMetaData
+#' @export
+pipe_AddMetaData <- function(obj, params = list(), pipe.name = NULL, ...) {
+  pipe.name <- c(pipe.name, "AddMetaData")
+  pipeMsg("Start")
+
+  defaults <- list(infile = NULL)
+  params <- getDefaultArgs(defaults, params)
+  captureMsg(str(params))
+  list2env(params, envir = environment())
+
+  for (i in seq_along(infile)) {
+    df <- readTable(infile[[i]], row.names = 1, keep.row.names = FALSE)
+    captureMsg(str(df))
+    obj <- AddMetaData(obj, df)
+  }
 
   obj
 }
@@ -145,11 +168,10 @@ pipe_ShrinkSeuratObject <- function(
 
   obj <- ShrinkSeuratObject(
     object = obj,
-    assays = params$assays,
-    scale.data = params$scale.data,
-    misc.counts = params$misc.counts
+    assays = assays,
+    scale.data = scale.data,
+    misc.counts = misc.counts
   )
-
 
   obj
 }
@@ -179,7 +201,6 @@ pipe_SubsetObject <- function(obj, params = list(), pipe.name = NULL, ...) {
     features = cells_features[['features']]
   )
 
-
   obj
 }
 
@@ -193,6 +214,92 @@ pipe_UpdateSeurat <- function(obj, params = list(), pipe.name = NULL, ...) {
 
   obj <- UpdateSeuratAll(object = obj, Assay5 = params$Assay5)
 
+  obj
+}
+
+#' @export
+pipe_DoubletFinder <- function(obj, params = list(), pipe.name = NULL, ...) {
+  pipe.name <- c(pipe.name, "DoubletFinder")
+  pipeMsg('Start')
+  checkPackages("DoubletFinder")
+
+  defaults <- list(
+    outdir = getwd(),
+    pN = 0.25,
+    dims = 1:50,
+    rate = NULL
+  )
+  params <- getDefaultArgs(defaults, params)
+  captureMsg(str(params))
+  list2env(params, envir = environment())
+
+  obj <- pipe_NormalizeData(obj, params = list(), pipe.name = pipe.name)
+  obj <- pipe_FindVariableFeatures(obj, params = list(), pipe.name = pipe.name)
+  obj <- pipe_ScaleData(obj, params = list(), pipe.name = pipe.name)
+  obj <- pipe_RunPCA(
+    obj,
+    params = list(npcs = max(dims)),
+    pipe.name = pipe.name
+  )
+  obj <- pipe_RunTSNE(obj, params = list(dims = dims), pipe.name = pipe.name)
+  obj <- pipe_RunUMAP(obj, params = list(dims = dims), pipe.name = pipe.name)
+
+  sweep.res.list <- DoubletFinder::paramSweep(obj, PCs = dims, sct = FALSE)
+  sweep.stats <- DoubletFinder::summarizeSweep(sweep.res.list)
+
+  pdf("find_pK.pdf", width = 5, height = 4)
+  bcmvn <- DoubletFinder::find.pK(sweep.stats)
+  dev.off()
+  pK <- as.numeric(as.vector(bcmvn$pK[which.max(bcmvn$BCmetric)[1]]))
+
+  rate <- rate %||% 7.6 * 10^-6 * ncol(obj) + 5.27 * 10^-4
+
+  nExp_poi <- round(as.numeric(rate) * ncol(obj))
+
+  if (exists("seurat_clusters", obj@meta.data)) {
+    annotations <- obj@meta.data$seurat_clusters
+    homotypic.prop <- DoubletFinder::modelHomotypic(annotations)
+    nExp_poi <- round(nExp_poi * (1 - homotypic.prop))
+  }
+
+  obj <- DoubletFinder::doubletFinder(
+    obj,
+    PCs = dims,
+    pN = pN,
+    pK = pK,
+    nExp = nExp_poi,
+    reuse.pANN = NULL,
+    sct = FALSE
+  )
+  colnames(obj@meta.data)[grep('pANN', colnames(obj@meta.data))] <- "pANN"
+  colnames(obj@meta.data)[grep('DF.classifications', colnames(obj@meta.data))] <- "classifications"
+
+  data <- FetchSeuratData(obj, c("pANN", "classifications"))
+  writeTable(data, "DF.classify.xls")
+
+  colors <- c("Singlet" = "black", "Doublet" = "red")
+
+  pipeMsg('Plotting dim_plot')
+  group.by <- c("classifications")
+  reductions <- c("tsne", "umap")
+  corner.axis <- TRUE
+  save_dim_plots(
+    obj,
+    outdir = outdir,
+    reductions = reductions,
+    group.by = group.by,
+    corner.axis = corner.axis,
+    colors = colors
+  )
+  pipeMsg('Plotting feature_dim_plot')
+  save_feature_dim_plots(
+    obj,
+    features = "pANN",
+    outdir = outdir,
+    reductions = reductions,
+    combine = FALSE,
+    corner.axis = corner.axis
+  )
 
   obj
 }
@@ -221,8 +328,69 @@ pipe_StatFeaturePercentage <- function(
     )
   }
 
-
   obj
+}
+
+#' @export
+pipe_StatCellQuality <- function(obj, params = list(), pipe.name = NULL, ...) {
+  pipe.name <- c(pipe.name, "StatCellQuality")
+  pipeMsg("Start")
+
+  defaults <- list(
+    outdir = getwd(),
+    sample.by = "orig.ident",
+    group.by = "Groups",
+    features = c("nFeature_RNA", "nCount_RNA", "percent.mito", "percent.rrna")
+  )
+  params <- getDefaultArgs(defaults, params)
+  captureMsg(str(params))
+  list2env(params, envir = environment())
+
+  features.use <- intersect(features, colnames(obj[[]]))
+  if (length(features.use) == 0) {
+    fastWarning(
+      "The following features are not found in obj@meta.data:\n ",
+      paste(features, collapse = ", ")
+    )
+    return(invisible(NULL))
+  }
+  sample.by <- sample.by[1]
+  if (!sample.by %in% colnames(obj[[]])) {
+    stop("'", sample.by, "' not found in obj@meta.data.")
+  }
+  group.by <- group.by[1]
+  if (!group.by %in% colnames(obj[[]])) {
+    group.by <- sample.by
+  }
+  pipeMsg("Ploting violin plots")
+  mkdir(outdir)
+  save_violin_plots(
+    obj = obj,
+    features = features.use,
+    outdir = outdir,
+    basic.size = 4,
+    group.by = sample.by,
+    combine = TRUE,
+    pt.size = 0.1,
+    raster = TRUE,
+    raster.dpi = 300,
+    ncol = length(features.use),
+    split.by = NULL
+  )
+  save_violin_plots(
+    obj = obj,
+    features = features.use,
+    outdir = outdir,
+    basic.size = 4,
+    group.by = group.by,
+    combine = TRUE,
+    pt.size = 0.1,
+    raster = TRUE,
+    raster.dpi = 300,
+    ncol = length(features.use),
+    split.by = NULL
+  )
+  invisible(NULL)
 }
 
 #' @export
@@ -244,7 +412,7 @@ pipe_MakeSeuratObj <- function(params, pipe.name = NULL, ...) {
   }
   name.list <- params[['name_list']]
   if (length(name.list) == 0) {
-    stop("No 'name_list' for MakeSeuratObj")
+    fastWarning("No 'name_list' for MakeSeuratObj")
   }
   assay <- params[['assay']] %||% "RNA"
 
@@ -260,7 +428,6 @@ pipe_MakeSeuratObj <- function(params, pipe.name = NULL, ...) {
 
   pipeMsg("Checking misc data", pipe.name = pipe.name)
   captureMsg(str(obj@misc))
-
 
   obj
 }
@@ -809,7 +976,6 @@ pipe_GetSeuratObj <- function(params = list(), pipe.name = NULL, ...) {
 
   obj <- pipe_RenameObject(obj, params, pipe.name = pipe.name)
 
-
   obj
 }
 
@@ -869,8 +1035,7 @@ pipe_PostClustering <- function(obj, params = list(), pipe.name = NULL, ...) {
   df <- FetchSeuratData(obj, out.names)
   writeTable(df, file.path(outdir, "Cells.cluster.list.xls"))
 
-
-  obj
+  invisible(NULL)
 }
 
 #' @export

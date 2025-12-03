@@ -18,6 +18,25 @@ run_seurat_main <- function(method, file) {
 }
 
 #' @export
+run_DoubletFinder <- function(file, indir, sample, outdir) {
+  pipeMsg("##### Reading parameter: ", file)
+  params <- readYAML(file)
+
+  pipeMsg("##### Format parameters")
+  params[['MakeSeuratObj']] <- list(
+    names = sample,
+    paths = indir
+  )
+  params[['outdir']] <- outdir
+
+  pipeMsg("##### Running DoubletFinder")
+  pipe_DoubletFinder_R(params)
+
+  pipeMsg("##### Finish pipeline")
+  invisible(NULL)
+}
+
+#' @export
 pipe_RenameObject_R <- function(params = list(), ...) {
   outfile <- params[['obj_out']]
   if (length(outfile) == 0) {
@@ -53,6 +72,8 @@ pipe_MakeSeuratObj_R <- function(params) {
 
   obj <- pipe_StatFeaturePercentage(obj, params[["StatFeaturePercentage"]])
 
+  obj <- pipe_AddMetaData(obj, params = params[['AddMetaData']])
+
   obj <- RenameSeuratColumns(obj, params[['rename_colnames']])
 
   obj <- pipe_RenameSeurat(obj, params[['rename']])
@@ -63,11 +84,17 @@ pipe_MakeSeuratObj_R <- function(params) {
 
   obj@misc$colData <- obj[[]]
 
+  params[["StatCellQuality"]][['outdir']] <- file.path(outdir, "before")
+  pipe_StatCellQuality(obj, params[["StatCellQuality"]])
+
   obj <- pipe_SubsetObject(obj, params[['subset']])
 
   mkdir(outdir)
   params[['StatFilterCells']][['outdir']] <- outdir
   pipe_StatFilterCells(obj, params[['StatFilterCells']])
+
+  params[["StatCellQuality"]][['outdir']] <- file.path(outdir, "after")
+  pipe_StatCellQuality(obj, params[["StatCellQuality"]])
 
   pipeMsg('Save object to: ', outfile)
   save(obj, file = outfile)
@@ -149,3 +176,20 @@ pipe_GroupDiffer_R <- function(params = list(), ...) {
 
   invisible(markers)
 }
+
+#' @export
+pipe_DoubletFinder_R <- function(params = list(), ...) {
+  outdir <- params[['outdir']] %||% getwd()
+
+  pipe_MultiCore(params)
+
+  checkKeys(params, "MakeSeuratObj")
+
+  obj <- pipe_MakeSeuratObj(params[["MakeSeuratObj"]])
+
+  mkdir(outdir, chdir = TRUE)
+  obj <- pipe_DoubletFinder(obj, params[['DoubletFinder']])
+
+  invisible(obj)
+}
+

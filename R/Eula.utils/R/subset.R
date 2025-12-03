@@ -39,14 +39,8 @@ filterData.logical <- function(x, ...) {
 #' @export
 #' @method filterData numeric
 filterData.numeric <- function(x, include = NULL, exclude = NULL, ...) {
-  include <- as.list(include)
-  exclude <- as.list(exclude)
-
-  include <- include[lengths(include) == 2]
-  include <- lapply(include, as.numeric)
-  exclude <- exclude[lengths(exclude) == 2]
-  exclude <- lapply(exclude, as.numeric)
-
+  include <- .get_num_ranges(include)
+  exclude <- .get_num_ranges(exclude)
   if (length(include) > 0) {
     include <- Reduce("|", lapply(include, function(r) x >= r[1] & x <= r[2]))
   } else {
@@ -77,3 +71,20 @@ filterData.data.frame <- function(
   verboseMsg("Filtering data by column '", column, "'.")
   filterData(x = x[[column]], include = include, exclude = exclude)
 }
+
+.get_num_ranges <- function(ranges) {
+  if (length(ranges) == 0) {
+    return(NULL)
+  }
+  if (is.numeric(ranges)) {
+    ranges <- list(ranges)
+  }
+  ranges <- as.list(ranges)
+  ranges <- lapply(ranges, as.numeric)
+  ranges <- ranges[lengths(ranges) == 2]
+  if (length(ranges) == 0) {
+    stop("'ranges' must be a list of 2-element numeric vectors.")
+  }
+  ranges
+}
+

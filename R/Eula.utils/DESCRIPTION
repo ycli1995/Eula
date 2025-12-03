@@ -13,6 +13,7 @@ RoxygenNote: 7.3.3
 Imports: 
     circlize,
     dplyr,
+    ggnewscale,
     ggplot2,
     magrittr,
     Matrix,

@@ -516,6 +516,8 @@ violin_plot.data.frame <- function(
     box.width = 0,
     box.color = "black",
     box.dodge.width = 0.9,
+    pt.group.by = NULL,
+    pt.colors = NULL,
     pt.size = 0,
     pt.alpha = 1,
     jitter.width = 0.3,
@@ -531,6 +533,7 @@ violin_plot.data.frame <- function(
   checkColumns(object, features)
 
   group.by <- group.by[1]
+  pt.group.by <- pt.group.by[1]
   orig.groups <- group.by
   group.by <- intersect(orig.groups, colnames(object))
   if (length(group.by) == 0) {
@@ -563,6 +566,12 @@ violin_plot.data.frame <- function(
       data[['y']] <- as.numeric(data[[i]])
     }
     data[, "colour"] <- data[[group.by]]
+    pt.data <- NULL
+    if (!is.null(pt.group.by)) {
+      pt.data <- data
+      pt.data[, "colour"] <- data[, pt.group.by]
+    }
+
     data[, "fill"] <- data[[group.by]]
     if (!is.null(split.by)) {
       data[, 'split'] <- object[, split.by]
@@ -570,6 +579,7 @@ violin_plot.data.frame <- function(
     if (isTRUE(order)) {
       data <- data[order(data[[i]]), , drop = FALSE]
     }
+
     labs.args[['title']] <- i
     plist[[i]] <- single_violin_plot(
       data = data,
@@ -582,6 +592,8 @@ violin_plot.data.frame <- function(
       box.width = box.width,
       box.color = box.color,
       box.dodge.width = box.dodge.width,
+      pt.data = pt.data,
+      pt.colors = pt.colors,
       pt.size = pt.size,
       pt.alpha = pt.alpha,
       jitter.width = jitter.width,
@@ -600,8 +612,3 @@ violin_plot.data.frame <- function(
   }
   plist
 }
-
-
-
-
-

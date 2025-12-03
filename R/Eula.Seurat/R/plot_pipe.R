@@ -200,8 +200,17 @@ save_feature_dim_plots <- function(
   if (combine) {
     features <- list(combine = features)
   } else {
-    features <- getFeaturesID(obj, features)
-    features <- getFeaturesName(obj, features, "unique_name")
+    features <- getFeaturesID(
+      obj,
+      features = features,
+      keep.not.found = TRUE
+    )
+    features <- getFeaturesName(
+      obj,
+      features = features,
+      col = "unique_name",
+      keep.not.found = TRUE
+    )
     names(features) <- features
   }
   split.by <- split.by[1]
@@ -257,8 +266,17 @@ save_violin_plots <- function(
   if (combine) {
     features <- list(combine = features)
   } else {
-    features <- getFeaturesID(obj, features)
-    features <- getFeaturesName(obj, features, "unique_name")
+    features <- getFeaturesID(
+      obj,
+      features = features,
+      keep.not.found = TRUE
+    )
+    features <- getFeaturesName(
+      obj,
+      features = features,
+      col = "unique_name",
+      keep.not.found = TRUE
+    )
     names(features) <- features
   }
   split.by <- split.by[1]
@@ -327,6 +345,7 @@ save_dim_plot <- function(
     basic.size = 5.5,
     reduction = "umap",
     group.by = NULL,
+    colors = NULL,
     label = NULL,
     legend = NULL,
     theme = NULL,
@@ -348,11 +367,12 @@ save_dim_plot <- function(
   legend <- intersect(legend, group.by)
   theme <- theme %||% theme_base_default()
 
+  colors <- colors %||% obj@misc$colors[group.by]
   p <- dim_plot(
     obj,
     group.by = group.by,
     reduction = reduction,
-    colors = obj@misc$colors,
+    colors = colors,
     label = label,
     split.by = NULL,
     shape.by = NULL,
@@ -407,7 +427,7 @@ save_feature_dim_plot <- function(
     theme = NULL,
     ...
 ) {
-  features <- getFeaturesID(obj, features)
+  features <- getFeaturesID(obj, features, keep.not.found = TRUE)
   p <- feature_dim_plot(
     object = obj,
     features = features,
@@ -492,12 +512,13 @@ save_violin_plot <- function(
   obj <- checkColorMap(obj, group.by, obj@misc$colors[[group.by]])
   colors <- colors %||% obj@misc$colors[[group.by]]
 
-  features <- getFeaturesID(obj, features)
+  features <- getFeaturesID(obj, features, keep.not.found = TRUE)
   p <- violin_plot(
     object = obj,
     features = features,
     assay = assay,
     slot = slot,
+    group.by = group.by,
     split.by = NULL,
     ncol = NULL,
     combine = FALSE,
@@ -520,7 +541,12 @@ save_violin_plot <- function(
     theme = theme,
     ...
   )
-  names(p) <- getFeaturesName(obj, features, "unique_name")
+  names(p) <- getFeaturesName(
+    obj,
+    features,
+    col = "unique_name",
+    keep.not.found = TRUE
+  )
   for (i in seq_along(p)) {
     p[[i]] <- p[[i]] + labs(title = names(p)[i]) + theme_no_legend()
   }
@@ -528,14 +554,16 @@ save_violin_plot <- function(
     return(p)
   }
   if (coord.flip) {
-    lab.size <- maxNChar(p[[1]]$data[["y"]]) * 0.08
+    lab.size <- maxNChar(p[[1]]$data[["y"]]) * 0.12
     w <- basic.size + lab.size + basic.size / 10
-    h <- length(unique(p[[1]]$data[["y"]])) * 0.25 + basic.size / 5
+    h <- length(unique(p[[1]]$data[["y"]])) * 0.35 + basic.size / 5
   } else {
-    lab.size <- maxNChar(p[[1]]$data[["x"]]) * 0.08 * 2/3
+    lab.size <- maxNChar(p[[1]]$data[["x"]]) * 0.12 * 2/3
     h <- basic.size + lab.size + basic.size / 10
-    w <- length(unique(p[[1]]$data[["x"]])) * 0.25 + basic.size / 5
+    w <- length(unique(p[[1]]$data[["x"]])) * 0.35 + basic.size / 5
   }
+  w <- max(3.5, w)
+  h <- max(4, h)
   ncol <- ncol %||% min(ceiling(sqrt(length(features))), 5)
   nrow <- ceiling(length(features) / ncol)
   if (length(p) == 1) {

@@ -1,6 +1,7 @@
 
 #' @importFrom ggplot2 geom_boxplot geom_jitter geom_violin position_dodge
 #' position_jitterdodge scale_fill_gradientn scale_fill_manual stat_summary
+#' @importFrom ggnewscale new_scale_color
 #' @export
 single_violin_plot <- function(
     data,
@@ -14,6 +15,8 @@ single_violin_plot <- function(
     box.width = 0,
     box.color = "black",
     box.dodge.width = 0.9,
+    pt.data = NULL,
+    pt.colors = NULL,
     pt.size = 0,
     pt.alpha = 1,
     jitter.width = 0.3,
@@ -48,8 +51,29 @@ single_violin_plot <- function(
       show.legend = violin.show.legend,
       ...
     )
+  if ("colour" %in% colnames(data) & !is.null(colors)) {
+    if (is.numeric(data$colour)) {
+      stop("'colour' must be factor or character for `single_violin_plot`.")
+    }
+    p <- p + scale_color_manual(values = colors)
+  }
+  if ("fill" %in% colnames(data) & !is.null(fills)) {
+    scale.fill <- if (is.numeric(data$fill)) {
+      scale_fill_gradientn(colors = fills, limits = fill.limits)
+    } else {
+      scale_fill_manual(values = fills)
+    }
+    p <- p + scale.fill
+  }
   if (pt.size > 0) {
+    pt.mapping <- NULL
+    if (!is.null(pt.data)) {
+      pt.cols <- c("x", "y", "colour")
+      pt.mapping <- get_mapping_from_data(pt.data, cols = pt.cols)
+    }
     geom.jitter <- geom_jitter(
+      data = pt.data,
+      mapping = pt.mapping,
       position = position_jitterdodge(
         jitter.width = jitter.width,
         dodge.width = jitter.dodge.width
@@ -63,7 +87,15 @@ single_violin_plot <- function(
       raster.dpi <- raster.dpi[1]
       geom.jitter <- ggrastr::rasterise(geom.jitter, dpi = raster.dpi)
     }
-    p <- p + geom.jitter
+    p <- p + geom.jitter + ggnewscale::new_scale_color()
+    if ("colour" %in% colnames(pt.data) & !is.null(pt.colors)) {
+      scale.color <- if (is.numeric(pt.data$colour)) {
+        scale_color_gradientn(colors = pt.colors)
+      } else {
+        scale_color_manual(values = pt.colors)
+      }
+      p <- p + scale.color
+    }
   }
   if (box.width > 0) {
     box.position <- position_dodge(width = box.dodge.width)
@@ -85,20 +117,7 @@ single_violin_plot <- function(
         size = 2.5
       )
   }
-  if ("colour" %in% colnames(data) & !is.null(colors)) {
-    if (is.numeric(data$colour)) {
-      stop("'colour' must be factor or character for `single_violin_plot`.")
-    }
-    p <- p + scale_color_manual(values = colors)
-  }
-  if ("fill" %in% colnames(data) & !is.null(fills)) {
-    scale.fill <- if (is.numeric(data$fill)) {
-      scale_fill_gradientn(colors = fills, limits = fill.limits)
-    } else {
-      scale_fill_manual(values = fills)
-    }
-    p <- p + scale.fill
-  }
+
   p <- .add_my_facet_split(p = p, args = facet.args)
   p <- add_my_labs(p, args = labs.args)
   p <- add_my_theme(p, args = theme)

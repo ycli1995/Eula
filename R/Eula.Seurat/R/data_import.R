@@ -154,6 +154,7 @@ MakeSeuratObj <- function(
       min.features = -1
     )
   }
+  gc(verbose = FALSE)
   # Merge objects, get pdata and matrix
   mats <- MergeObject(mats)
   pdata <- mats[[]]

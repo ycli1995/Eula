@@ -8,7 +8,13 @@ getFeaturesID <- function(object, features, ...) {
 
 #' @export
 #' @method getFeaturesID data.frame
-getFeaturesID.data.frame <- function(object, features, uniq = FALSE, ...) {
+getFeaturesID.data.frame <- function(
+    object,
+    features,
+    uniq = FALSE,
+    keep.not.found = FALSE,
+    ...
+) {
   if (length(features) == 0) {
     return(features)
   }
@@ -42,6 +48,9 @@ getFeaturesID.data.frame <- function(object, features, uniq = FALSE, ...) {
       return(unique(rownames(object)[g4]))
     }
     message("[WARNING] '", x, "' not found gene id.")
+    if (keep.not.found) {
+      return(x)
+    }
     return(NULL)
   }, simplify = FALSE)
   features <- unlist(features)
@@ -72,8 +81,10 @@ getFeaturesName.data.frame <- function(
   checkColumns(object, cols = cols)
   col <- match.arg(col, choices = cols)
 
-  features.id <- getFeaturesID(object, features = features)
+  features.id <- getFeaturesID(object, features = features, ...)
   out <- object[features.id, col]
+  na.idx <- which(is.na(out))
+  out[na.idx] <- features.id[na.idx]
   names(out) <- features.id
 
   if (uniq) {
