@@ -17,7 +17,7 @@ filterData.character <- function(x, include = NULL, exclude = NULL, ...) {
     include <- rep.int(TRUE, length(x))
   }
   if (length(exclude) > 0) {
-    exclude <- !x %in% exclude
+    exclude <- x %in% exclude
   } else {
     exclude <- rep.int(FALSE, length(x))
   }
