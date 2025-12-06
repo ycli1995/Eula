@@ -102,6 +102,25 @@ runEnrich <- function(
   results[order(results$p_val), ]
 }
 
+#' @export
+computeIC <- function(all.terms, targets, off.springs) {
+  targets <- unique(targets)
+  n.all <- table(all.terms)
+  miss.terms <- setdiff(targets, names(n.all))
+  n.all <- c(
+    setNames(as.vector(n.all), names(n.all)),
+    setNames(double(length(miss.terms)), miss.terms)
+  )
+  n.targets <- vapply(
+    X = targets,
+    FUN = function(i) sum(n.all[off.springs[[i]]], na.rm = TRUE),
+    FUN.VALUE = numeric(1)
+  ) +
+    n.all[targets]
+  IC <- -log(n.targets / sum(n.all))
+  IC
+}
+
 .select_geneset_by_size <- function(genesets, min.size, max.size) {
   if (is.na(min.size) || is.null(min.size)) {
     min.size <- 1
