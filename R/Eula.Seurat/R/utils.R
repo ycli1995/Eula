@@ -305,7 +305,7 @@ CellCycle.Seurat <- function(
     slot = slot,
     ...
   )
-  object[[colnames(features.scores.use)]] <- features.scores.use
+  object <- AddMetaData(object, metadata = features.scores.use)
   DefaultAssay(object) <- assay.old
   if (set.ident) {
     Idents(object) <- "Phase"

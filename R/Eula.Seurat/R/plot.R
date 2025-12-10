@@ -305,6 +305,7 @@ violin_plot.Seurat <- function(
   vars <- c(group.by, extras, features)
   if (!is.null(reduction)) {
     reduc.obj <- object[[reduction]]
+    object@reductions <- object@reductions[reduction]
     cells <- cells %||% Cells(object, assay = DefaultAssay(reduc.obj))
     vars <- c(paste0(Key(reduc.obj), dims), vars)
   } else {
