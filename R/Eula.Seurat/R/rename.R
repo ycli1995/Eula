@@ -4,7 +4,7 @@
 #' @method recodeFactor Seurat
 recodeFactor.Seurat <- function(
     x, map, column,
-    keep.orders = FALSE,
+    keep.order = FALSE,
     set.ident = FALSE,
     verbose = TRUE,
     ...
@@ -14,7 +14,7 @@ recodeFactor.Seurat <- function(
     x = x@meta.data,
     map = map,
     column = column,
-    keep.orders = keep.orders,
+    keep.order = keep.order,
     verbose = verbose,
     ...
   )
@@ -90,7 +90,7 @@ RenameSeurat <- function(
     colors = NULL,
     misc.name = NULL,
     set.ident = FALSE,
-    keep.orders = FALSE,
+    keep.order = FALSE,
     verbose = TRUE,
     ...
 ) {
@@ -99,7 +99,7 @@ RenameSeurat <- function(
       map = map,
       column = column,
       set.ident = set.ident,
-      keep.orders = keep.orders,
+      keep.order = keep.order,
       verbose = verbose
     ) %>%
     checkColorMap(
@@ -131,7 +131,7 @@ RenameSeuratMetaData <- function(object, parameter = list()) {
   }
 
   set.ident <- parameter[["set.ident"]] %||% FALSE
-  keep.orders <- parameter[["keep.orders"]] %||% FALSE
+  keep.order <- parameter[["keep.order"]] %||% FALSE
 
   color.name <- parameter[["color_name"]] %||% .COLOR_NAMES[[column]]
   color.name <- color.name %||% column
@@ -156,7 +156,7 @@ RenameSeuratMetaData <- function(object, parameter = list()) {
     misc.name = color.name,
     colors = colors,
     set.ident = set.ident,
-    keep.orders = keep.orders
+    keep.order = keep.order
   )
   object
 }

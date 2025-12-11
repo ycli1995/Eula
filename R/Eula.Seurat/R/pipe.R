@@ -69,7 +69,7 @@ pipe_RenameSeuratMetaData <- function(
   }
 
   set.ident <- params[["set.ident"]] %||% FALSE
-  keep.orders <- params[["keep.orders"]] %||% FALSE
+  keep.order <- params[["keep.order"]] %||% FALSE
 
   color.name <- params[["color_name"]] %||% COLOR.NAMES[[column]]
   color.name <- color.name %||% column
@@ -94,7 +94,7 @@ pipe_RenameSeuratMetaData <- function(
     misc.name = color.name,
     colors = colors,
     set.ident = set.ident,
-    keep.orders = keep.orders
+    keep.order = keep.order
   )
 
   obj

@@ -40,6 +40,7 @@ pipeMsg <- function(
   if (type == "Stopped") {
     q(status = 1)
   }
+  invisible(NULL)
 }
 
 #' @export

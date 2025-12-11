@@ -3,36 +3,64 @@
 #' @importFrom magrittr %>%
 NULL
 
+#' Change factor levels
+#'
+#' @param x An object to modify
+#' @param ... `r .dot_param`
+#'
+#' @name recodeFactor
 #' @export recodeFactor
 recodeFactor <- function(x, ...) {
   UseMethod("recodeFactor", x)
 }
 
-#' @importFrom dplyr recode recode_factor
+#' @param map A list mapping new levels to old levels. Must formatted as
+#' following:
+#' ```
+#' list(
+#'   new.level1 = c(old.level1, old.level3, ...),
+#'   new.level2 = old.level2,
+#'   new.level3 = old.level4,
+#'   ...
+#' )
+#' ```
+#' @param keep.order Logical, whether or not to keep the orignial order of old
+#' levels. Default is `FALSE`, which means the new order should depend on names
+#' of `map`.
 #'
+#' @returns
+#' A factor or character vector that is recoded according to `map`.
+#'
+#' @importFrom forcats fct_recode fct_relevel
+#'
+#' @rdname recodeFactor
 #' @export
 #' @method recodeFactor default
-recodeFactor.default <- function(x, map, keep.orders = FALSE, ...) {
-  if (keep.orders) {
-    recode.func <- dplyr::recode
-  } else {
-    recode.func <- dplyr::recode_factor
+recodeFactor.default <- function(x, map, keep.order = FALSE, ...) {
+  map <- unlistMap(map)
+  old.class <- class(x)
+  x <- as.factor(x)
+  map <- map[map %in% levels(x)]
+  x <- fct_recode(x, !!!map)
+  if (keep.order) {
+    return(as(x, old.class))
   }
-  map <- unlistMap(map = map)
-  x <- x %>%
-    as.factor() %>%
-    recode.func(!!!map) %>%
-    as(Class = class(x))
-  x
+  x <- fct_relevel(x, unique(names(map)))
+  as(x, old.class)
 }
 
+#' @param column Character or integer scalar, indicating which column to be
+#' recoded.
+#' @param verbose `r .vb_param`
+#'
+#' @rdname recodeFactor
 #' @export
 #' @method recodeFactor data.frame
 recodeFactor.data.frame <- function(
     x,
     map,
     column,
-    keep.orders = FALSE,
+    keep.order = FALSE,
     verbose = TRUE,
     ...
 ) {
@@ -43,7 +71,7 @@ recodeFactor.data.frame <- function(
   verboseMsg("Replace entries in column '", column, "':")
   column.old <- paste0(column, "_old")
   x[, column.old] <- x[, column]
-  x[, column] <- recodeFactor(x[, column], map = map, keep.orders = keep.orders)
+  x[, column] <- recodeFactor(x[, column], map = map, keep.order = keep.order)
   if (verbose) {
     captureMsg(table(x[, column], x[, column.old]))
   }
@@ -51,10 +79,14 @@ recodeFactor.data.frame <- function(
 }
 
 #' @export
-unlistMap <- function(map) {
+unlistMap <- function(map, reverse = FALSE) {
   map <- stack(map)
-  map <- setNames(as.character(map$ind), nm = map$values)
-  map[unique(names(map))]
+  if (reverse) {
+    map <- setNames(as.character(map$ind), as.character(map$values))
+    return(map[unique(names(map))])
+  }
+  map <- setNames(as.character(map$values), as.character(map$ind))
+  map[!duplicated(map)]
 }
 
 #' @export
