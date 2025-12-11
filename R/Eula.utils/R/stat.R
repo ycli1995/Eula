@@ -6,6 +6,7 @@ statByGroups <- function(x, ...) {
   UseMethod("statByGroups", x)
 }
 
+#' @importFrom dplyr ungroup
 #' @export
 #' @method statByGroups data.frame
 statByGroups.data.frame <- function(
@@ -46,7 +47,7 @@ statByGroups.data.frame <- function(
   if (validCharacters(add.pct)) {
     stat <- stat %>%
       dplyr::ungroup() %>%
-      mutate(
+      dplyr::mutate(
         across(all_of(n.name), ~ . / sum(.), .names = add.pct),
         .after = all_of(n.name)
       )

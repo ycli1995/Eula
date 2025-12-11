@@ -89,14 +89,19 @@ unlistMap <- function(map, reverse = FALSE) {
   map[!duplicated(map)]
 }
 
+#' Collapse two factors
+#'
+#' @param x,y Factors to collapse
+#' @param collapse A character string to separate the results.
+#' @param rev Logical, whether or not to use `y` as the major levels.
+#'
+#' @returns
+#' A new factor vetcor that collapses `x` and `y`.
+#'
 #' @export
 pasteFactors <- function(x, y, collapse = "_", rev = FALSE) {
-  if (!is.factor(x)) {
-    x <- as.factor(x)
-  }
-  if (!is.factor(y)) {
-    y <- as.factor(y)
-  }
+  x <- as.factor(x)
+  y <- as.factor(y)
   lv <- sapply(levels(x), paste0, collapse, levels(y), simplify = TRUE)
   if (rev) {
     lv <- t(lv)

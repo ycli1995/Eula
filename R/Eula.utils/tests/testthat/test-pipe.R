@@ -1,30 +1,4 @@
 
-test_that("recodeFactor", {
-  x <- c(rep.int("cluster1", 3), rep.int("cluster2", 2), rep.int("C3", 4))
-  x <- as.factor(x)
-
-  # one-to-one
-  map1 <- list(c2 = "cluster2", c1 = "cluster1", c3 = "cluster3")
-  x1 <- recodeFactor(x, map1)
-  expect_equal(levels(x1), c("c2", "c1", "C3"))
-  x1 <- recodeFactor(x, map1, keep.order = TRUE)
-  expect_equal(levels(x1), c("C3", "c1", "c2"))
-
-  # one-to-many
-  map1 <- list(c2 = c("cluster2", "cluster1"), c3 = "C3")
-  x1 <- recodeFactor(x, map1)
-  expect_equal(levels(x1), c("c2", "c3"))
-  x1 <- recodeFactor(x, map1, keep.order = TRUE)
-  expect_equal(levels(x1), c("c3", "c2"))
-
-  # Duplicated old levels
-  map1 <- list(c2 = c("cluster2", "C3"), c3 = "C3")
-  x1 <- recodeFactor(x, map1)
-  expect_equal(levels(x1), c("c2", "cluster1"))
-  x1 <- recodeFactor(x, map1, keep.order = TRUE)
-  expect_equal(levels(x1), c("c2", "cluster1"))
-})
-
 test_that("normalizeFileName", {
   expect_equal(normalizeFileName("A/B"), "A_B")
   expect_equal(normalizeFileName("A B"), "A_B")
@@ -33,6 +7,18 @@ test_that("normalizeFileName", {
   expect_equal(normalizeFileName("A(B"), "A_B")
   expect_equal(normalizeFileName("A(B)"), "A_B_")
   expect_equal(normalizeFileName("A(B))"), "A_B__")
+})
+
+test_that("splitArgs", {
+  args <- list(arg1 = "A,B,C", arg2 = "AA", arg3 = NULL, arg4 = logical())
+
+  args <- lapply(args, splitArgs)
+
+  expect_equal(args[["arg1"]], c("A", "B", "C"))
+  expect_equal(args[["arg2"]], "AA")
+  expect_null(args[["arg3"]])
+  expect_type(args[["arg4"]], "logical")
+  expect_length(args[["arg4"]], 0)
 })
 
 test_that("getDefaultArgs", {

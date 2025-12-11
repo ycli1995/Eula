@@ -1,3 +1,5 @@
+#' @include verbose.R
+#'
 #' @importFrom tools file_path_as_absolute
 NULL
 
@@ -96,9 +98,16 @@ writeTable <- function(
   )
 }
 
+#' Reload saved datasets
+#'
+#' @param file A character string giving the name of file to load. Must be an
+#' `.Rda` or `.Rds`.
+#' @param verbose `r .vb_param`
+#'
 #' @importFrom tools file_path_as_absolute
 #' @export
-readRDX <- function(file) {
+#' @name readRDX
+readRDX <- function(file, verbose = TRUE) {
   file <- file_path_as_absolute(file)
   verboseMsg("Loading: ", file)
   con <- gzfile(file)
@@ -110,18 +119,30 @@ readRDX <- function(file) {
   readRDS(file)
 }
 
+#' @rdname readRDX
 #' @export
-Load <- function(file) {
-  readRDX(file)
+Load <- function(file, ...) {
+  readRDX(file, ...)
 }
 
+#' Create a directory
+#'
+#' Create a directory with an option to set it as the work directory.
+#'
+#' @param path A character vector containing a single path name.
+#' @param chdir Logical, whether to change the work directory into `path`.
+#'
+#' @returns
+#' An invisibly logical vector indicating if the operation succeeded.
+#'
 #' @export
 mkdir <- function(path, chdir = FALSE) {
-  dir.create(path, showWarnings = FALSE, recursive = TRUE)
+  path <- path[1]
+  x <- dir.create(path, showWarnings = FALSE, recursive = TRUE)
   if (chdir) {
     setwd(path)
   }
-  invisible(NULL)
+  invisible(x)
 }
 
 .check_dir <- function(file) {
