@@ -35,7 +35,8 @@ Suggests:
     randomcoloR,
     Rttf2pt1,
     scattermore,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    withr
 Config/testthat/edition: 3
 Collate: 
     'verbose.R'
@@ -44,6 +45,7 @@ Collate:
     'corner_axis.R'
     'diff_exp.R'
     'enrich.R'
+    'filter.R'
     'genes.R'
     'grouping.R'
     'matrix.R'
@@ -54,7 +56,6 @@ Collate:
     'rename.R'
     'roxygen2-doc.R'
     'stat.R'
-    'subset.R'
     'utils.R'
     'viz-single_plot.R'
     'viz-theme.R'

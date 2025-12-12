@@ -8,16 +8,32 @@ splitArgs <- function(arg, split = ",") {
 }
 
 #' @export
-filterArgs <- function(params, functions) {
+filterArgs <- function(args, functions) {
   all.args <- lapply(functions, formalArgs)
   all.args <- unique(unlist(all.args))
 
-  keep.args <- intersect(names(params), all.args)
-  params[keep.args]
+  keep.args <- intersect(names(args), all.args)
+  args[keep.args]
 }
 
+#' Full-fill a list of arguments with defaults
+#'
+#' @param args A list of arguments.
+#' @param defaults A list of default arguments.
+#' @param ... `r .dot_param`
+#'
+#' @details
+#' Arguments as `NULL` (no default value) in `defaults` are also kept and will
+#' be assigned to `args`.
+#'
+#' @returns
+#' A full-filled `args` containing all key-value present in `defaults`.
+#'
 #' @export
-getDefaultArgs <- function(defaults, args = list(), ...) {
+getDefaultArgs <- function(args = list(), defaults = list(), ...) {
+  if (!is.list(defaults)) {
+    stop("'defaults' must be a list.")
+  }
   null.args <- c()
   for (i in names(defaults)) {
     args[[i]] <- args[[i]] %||% defaults[[i]]

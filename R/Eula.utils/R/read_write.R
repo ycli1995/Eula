@@ -104,6 +104,10 @@ writeTable <- function(
 #' `.Rda` or `.Rds`.
 #' @param verbose `r .vb_param`
 #'
+#' @returns
+#' An object saved in the `.Rda` or `.Rds` file. If the `.Rda` file contains
+#' more than one object, ONLY fetch the first one.
+#'
 #' @importFrom tools file_path_as_absolute
 #' @export
 #' @name readRDX
@@ -112,9 +116,9 @@ readRDX <- function(file, verbose = TRUE) {
   verboseMsg("Loading: ", file)
   con <- gzfile(file)
   on.exit(close(con))
-  magic <- readChar(con, 5L, useBytes = TRUE)
+  suppressWarnings(magic <- readChar(con, 5L, useBytes = TRUE))
   if (grepl("RD[ABX][2-9]\n", magic)) {
-    return(get(load(file)))
+    return(get(load(file)[1]))
   }
   readRDS(file)
 }

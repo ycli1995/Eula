@@ -8,26 +8,23 @@ filterData <- function(x, ...) {
 
 #' @export
 #' @method filterData character
-filterData.character <- function(x, include = NULL, exclude = NULL, ...) {
+filterData.character <- function(x, include = NULL, invert = FALSE, ...) {
   include <- as.character(include)
-  exclude <- as.character(exclude)
   if (length(include) > 0) {
     include <- x %in% include
   } else {
     include <- rep.int(TRUE, length(x))
   }
-  if (length(exclude) > 0) {
-    exclude <- x %in% exclude
-  } else {
-    exclude <- rep.int(FALSE, length(x))
+  if (invert) {
+    return(!include)
   }
-  (include & !exclude)
+  include
 }
 
 #' @export
 #' @method filterData factor
-filterData.factor <- function(x, include = NULL, exclude = NULL, ...) {
-  filterData.character(x = x, include = include, exclude = exclude)
+filterData.factor <- function(x, include = NULL, invert = FALSE, ...) {
+  filterData.character(x = x, include = include, invert = invert)
 }
 
 #' @export
@@ -38,20 +35,17 @@ filterData.logical <- function(x, ...) {
 
 #' @export
 #' @method filterData numeric
-filterData.numeric <- function(x, include = NULL, exclude = NULL, ...) {
+filterData.numeric <- function(x, include = NULL, invert = FALSE, ...) {
   include <- .get_num_ranges(include)
-  exclude <- .get_num_ranges(exclude)
   if (length(include) > 0) {
     include <- Reduce("|", lapply(include, function(r) x >= r[1] & x <= r[2]))
   } else {
     include <- rep.int(TRUE, length(x))
   }
-  if (length(exclude) > 0) {
-    exclude <- Reduce("|", lapply(exclude, function(r) x >= r[1] & x <= r[2]))
-  } else {
-    exclude <- rep.int(FALSE, length(x))
+  if (invert) {
+    return(!include)
   }
-  (include & !exclude)
+  include
 }
 
 #' @export
@@ -60,7 +54,7 @@ filterData.data.frame <- function(
     x,
     column,
     include = NULL,
-    exclude = NULL,
+    invert = FALSE,
     verbose = TRUE,
     ...
 ) {
@@ -69,7 +63,7 @@ filterData.data.frame <- function(
     return(rep.int(TRUE, nrow(x)))
   }
   verboseMsg("Filtering data by column '", column, "'.")
-  filterData(x = x[[column]], include = include, exclude = exclude)
+  filterData(x = x[[column]], include = include, invert = invert, ...)
 }
 
 .get_num_ranges <- function(ranges) {
@@ -87,4 +81,3 @@ filterData.data.frame <- function(
   }
   ranges
 }
-

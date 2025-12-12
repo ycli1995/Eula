@@ -84,11 +84,17 @@ SubsetObject <- function(
   cells_kp <- rownames(object[[]])
   for (i in names(column_map)) {
     if (!is.null(column_map[[i]])) {
+      invert <- column_map[[i]][['invert']] %||% FALSE
+      include <- column_map[[i]][['include']]
+      if (length(column_map[[i]][['exclude']]) > 0) {
+        include <- column_map[[i]][['exclude']]
+        invert <- TRUE
+      }
       filter.out <- filterData(
         x = object[[]],
         column = i,
-        include = column_map[[i]][['include']],
-        exclude = column_map[[i]][['exclude']]
+        include = include,
+        invert = invert
       )
       use_cells <- rownames(object[[]])[filter.out]
       cells_kp <- intersect(cells_kp, use_cells)

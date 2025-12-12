@@ -10,15 +10,44 @@ test_that("normalizeFileName", {
 })
 
 test_that("splitArgs", {
-  args <- list(arg1 = "A,B,C", arg2 = "AA", arg3 = NULL, arg4 = logical())
+  args <- list(
+    arg1 = "A,B,C",
+    arg2 = "AA",
+    arg3 = NULL,
+    arg4 = logical()
+  )
+  new.args <- lapply(args, splitArgs)
+  nochange <- setdiff(names(args), "arg1")
+  for (i in nochange) {
+    expect_equal(new.args[[i]], args[[i]])
+  }
+  expect_equal(new.args[["arg1"]], c("A", "B", "C"))
+})
 
-  args <- lapply(args, splitArgs)
+test_that("getArgList", {
+  genes <- c("gene1", "gene2", "gene3")
+  genes_file <- withr::local_tempfile()
+  write(genes, genes_file)
 
-  expect_equal(args[["arg1"]], c("A", "B", "C"))
-  expect_equal(args[["arg2"]], "AA")
-  expect_null(args[["arg3"]])
-  expect_type(args[["arg4"]], "logical")
-  expect_length(args[["arg4"]], 0)
+  args <- list(
+    empty = NULL,
+    empty.char = character(),
+    empty.logi = logical(),
+    empty.num = numeric(),
+    coma.char = "AA,B,CC",
+    multi.char = letters[1:5],
+    multi.logi = rep(TRUE, 3),
+    multi.num = 1:3,
+    list.args = list(AA = 1, BB = 2),
+    gene.list = genes_file
+  )
+  new.args <- lapply(args, getArgList)
+  nochange <- setdiff(names(args), c("coma.char", "gene.list"))
+  for (i in nochange) {
+    expect_equal(new.args[[i]], args[[i]])
+  }
+  expect_equal(new.args[["coma.char"]], c("AA", "B", "CC"), ignore_attr = TRUE)
+  expect_equal(new.args[["gene.list"]], genes, ignore_attr = TRUE)
 })
 
 test_that("getDefaultArgs", {
@@ -31,7 +60,7 @@ test_that("getDefaultArgs", {
     assay = NULL,
     reductions = NULL
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   list2env(params, envir = environment())
 
   expect_null(assay)

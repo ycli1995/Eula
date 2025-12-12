@@ -17,7 +17,7 @@ pipe_dim_plot <- function(obj, params = list(), pipe.name = NULL, ...) {
     label = NULL,
     legend = NULL
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   print(str(params))
   list2env(params, envir = environment())
 
@@ -53,7 +53,7 @@ pipe_dot_plot <- function(obj, params = list(), ...) {
     size.limits = c(0, 100),
     coord.flip = FALSE
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   capture.msg(str(params))
   list2env(params, envir = environment())
 
@@ -104,7 +104,7 @@ pipe_violin_plot <- function(obj, params = list(), ...) {
     facet.args = list(),
     theme = NULL
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   capture.msg(str(params))
   list2env(params, envir = environment())
 

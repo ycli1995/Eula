@@ -15,6 +15,10 @@ Load(file, ...)
 
 \item{verbose}{Logical, whether to print the progress information to console.}
 }
+\value{
+An object saved in the \code{.Rda} or \code{.Rds} file. If the \code{.Rda} file contains
+more than one object, ONLY fetch the first one.
+}
 \description{
 Reload saved datasets
 }

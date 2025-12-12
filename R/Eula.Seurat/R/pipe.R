@@ -131,7 +131,7 @@ pipe_AddMetaData <- function(obj, params = list(), pipe.name = NULL, ...) {
   pipeMsg("Start")
 
   defaults <- list(infile = NULL)
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
   list2env(params, envir = environment())
 
@@ -159,7 +159,7 @@ pipe_ShrinkSeuratObject <- function(
     misc.counts = TRUE,
     assays = Assays(obj)
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params$assays <- intersect(params$assays, Assays(obj))
   params <- params[names(defaults)]
 
@@ -229,7 +229,7 @@ pipe_DoubletFinder <- function(obj, params = list(), pipe.name = NULL, ...) {
     dims = 1:50,
     rate = NULL
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
   list2env(params, envir = environment())
 
@@ -342,7 +342,7 @@ pipe_StatCellQuality <- function(obj, params = list(), pipe.name = NULL, ...) {
     group.by = "Groups",
     features = c("nFeature_RNA", "nCount_RNA", "percent.mito", "percent.rrna")
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
   list2env(params, envir = environment())
 
@@ -449,7 +449,7 @@ pipe_FindVariableFeatures <- function(
     selection.method = "vst",
     nfeatures = 2000
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['vfeatures']] <- getArgList(params[['vfeatures']])
   params[['vfeature.must']] <- getArgList(params[['vfeature.must']])
   params[['vfeature.remove']] <- getArgList(params[['vfeature.remove']])
@@ -506,7 +506,7 @@ pipe_CellCycleScoring <- function(obj, params = list(), pipe.name = NULL, ...) {
 
   params[['s.features']] <- getArgList(params[['s.features']])
   params[['g2m.features']] <- getArgList(params[['g2m.features']])
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
 
   if (any(lengths(params[c('s.features', 'g2m.features')]) < 2)) {
@@ -556,7 +556,7 @@ pipe_NormalizeData <- function(obj, params = list(), pipe.name = NULL, ...) {
     scale.factor = 10000,
     assay = DefaultAssay(obj)
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
 
   list2env(params, envir = environment())
@@ -582,7 +582,7 @@ pipe_ScaleData <- function(obj, params = list(), pipe.name = NULL, ...) {
     scale.max = 10,
     only.var.features = TRUE
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['vars.to.regress']] <- params[['vars.to.regress']] %||%
     c(paste0("nCount_", params[['assay']]), "percent.mito")
   params[['vars.to.regress']] <- unique(c(
@@ -623,7 +623,7 @@ pipe_RunPCA <- function(obj, params = list(), pipe.name = NULL, ...) {
     reduction.key = "PC_",
     reduction.name = "pca"
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
     params[['assay']]
   captureMsg(str(params))
@@ -671,7 +671,7 @@ pipe_RunTSNE <- function(obj, params = list(), pipe.name = NULL, ...) {
     perplexity = 30,
     reduction.name = "tsne"
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['dims']] <- params[['dims']] %0%
     seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
   params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
@@ -726,7 +726,7 @@ pipe_RunUMAP <- function(obj, params = list(), pipe.name = NULL, ...) {
     set.op.mix.ratio = 1,
     reduction.name = "umap"
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['reduction.surfix']] <- params[['reduction.surfix']] %||%
     params[['reduction']]
   params[['dims']] <- params[['dims']] %0%
@@ -795,7 +795,7 @@ pipe_FindClusters <- function(obj, params = list(), pipe.name = NULL, ...) {
     seed = 42,
     group.singletons = TRUE
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['dims']] <- params[['dims']] %0%
     seq_len(ncol(Embeddings(obj, reduction = params[['reduction']])))
   captureMsg(str(params))
@@ -865,7 +865,7 @@ pipe_IntegrateData <- function(obj, params = list(), pipe.name = NULL, ...) {
     split.by = "orig.ident",
     theta = 2
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['method']] <- match.arg(
     params[['method']],
     choices = c("harmony", "CCA", "RPCA")
@@ -935,7 +935,7 @@ pipe_StatFilterCells <- function(obj, params = list(), pipe.name = NULL, ...) {
     outdir = getwd(),
     group.by = c("Samples", "Groups")
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
   list2env(params, envir = environment())
 
@@ -992,7 +992,7 @@ pipe_PostClustering <- function(obj, params = list(), pipe.name = NULL, ...) {
     reductions = c("tsne", "umap"),
     corner.axis = TRUE
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
   list2env(params, envir = environment())
 
@@ -1065,7 +1065,7 @@ pipe_FindAllMarkers <- function(obj, params = list(), pipe.name = NULL, ...) {
     base = 2,
     seed = 42
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   params[['features']] <- getArgList(params[['features']])
   params[['features']] <- getFeaturesID(obj, params[['features']])
 
@@ -1139,7 +1139,7 @@ pipe_PostFindAllMarkers <- function(
     corner.axis = TRUE,
     reductions = "umap"
   )
-  params <- getDefaultArgs(defaults, params)
+  params <- getDefaultArgs(params, defaults)
   captureMsg(str(params))
   list2env(params, envir = environment())
 
@@ -1298,8 +1298,8 @@ pipe_GroupDiffer <- function(obj, params = list(), pipe.name = NULL, ...) {
     seed = 42
   )
   params[['findGroupDiffer']] <- getDefaultArgs(
-    defaults,
-    params[['findGroupDiffer']]
+    params[['findGroupDiffer']],
+    defaults
   )
   captureMsg(str(params))
 
