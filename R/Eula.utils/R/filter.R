@@ -1,11 +1,42 @@
 #' @include verbose.R
 NULL
 
-#' @export
+#' Filter data according to set or ranges
+#'
+#' @param x An object
+#' @param ... `r .dot_param`
+#'
+#' @export filterData
+#' @name filterData
 filterData <- function(x, ...) {
   UseMethod("filterData", x)
 }
 
+#' @returns
+#' When `x` is a logical vector, return itself.
+#'
+#' @rdname filterData
+#' @export
+#' @method filterData logical
+filterData.logical <- function(x, ...) {
+  x
+}
+
+#' @param include One of the following:
+#' \itemize{
+#' \item A character vector indicating the element set to include.
+#' \item A 2-element numeric vector indicating the range to include.
+#' \item A list of several 2-element numeric vectors indicating multiple range
+#' to match. Any vector that doesn't have 2 elements will be ignored.
+#' }
+#' @param invert Logical. If `TRUE` return the logical indices for elements that
+#' are not within `include`.
+#'
+#' @returns
+#' When `x` is a character or numeric vector, return a logical indices of the
+#' elements in `x` that match `include`.
+#'
+#' @rdname filterData
 #' @export
 #' @method filterData character
 filterData.character <- function(x, include = NULL, invert = FALSE, ...) {
@@ -21,18 +52,14 @@ filterData.character <- function(x, include = NULL, invert = FALSE, ...) {
   include
 }
 
+#' @rdname filterData
 #' @export
 #' @method filterData factor
 filterData.factor <- function(x, include = NULL, invert = FALSE, ...) {
   filterData.character(x = x, include = include, invert = invert)
 }
 
-#' @export
-#' @method filterData logical
-filterData.logical <- function(x, ...) {
-  x
-}
-
+#' @rdname filterData
 #' @export
 #' @method filterData numeric
 filterData.numeric <- function(x, include = NULL, invert = FALSE, ...) {
@@ -48,6 +75,14 @@ filterData.numeric <- function(x, include = NULL, invert = FALSE, ...) {
   include
 }
 
+#' @param column A string indicating the column names used for filtering.
+#' @param verbose `r .vb_param`
+#'
+#' @returns
+#' When `x` is a `data.frame`, return a logical indices of the rows at which the
+#' `column` matches `include`.
+#'
+#' @rdname filterData
 #' @export
 #' @method filterData data.frame
 filterData.data.frame <- function(

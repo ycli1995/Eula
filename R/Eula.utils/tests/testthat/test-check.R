@@ -3,6 +3,7 @@ test_that("checkColumns", {
   data("cars")
   expect_invisible(checkColumns(cars, c("dist")))
   expect_invisible(checkColumns(cars, c("speed", "dist")))
+  expect_error(checkColumns(cars, cols = NULL))
   expect_error(checkColumns(cars, c("speed", "dist", "col1")))
   expect_error(checkColumns(cars, c("dist", "col1")))
   expect_error(checkColumns(cars, c("col1", "col2")))
@@ -35,3 +36,13 @@ test_that("validCharacters", {
   expect_equal(validCharacters(x), y)
 })
 
+test_that("checkPackages", {
+  ok.pkgs <- c("base", "utils")
+  miss.pkgs <- c("not_found1", "not_found2")
+
+  expect_invisible(checkPackages(ok.pkgs))
+  expect_null(checkPackages(ok.pkgs))
+
+  expect_error(checkPackages(miss.pkgs))
+  expect_warning(checkPackages(miss.pkgs, required = FALSE))
+})
