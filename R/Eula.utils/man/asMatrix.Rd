@@ -29,5 +29,5 @@ chunk.}
 A dense \code{matrix} converted from \code{object}.
 }
 \description{
-Convert to dense matrix
+Convert a matrix-like object into dense matrix in row chunks.
 }
