@@ -17,8 +17,8 @@ Usage:
 	--interval      <int> Interval time (in seconds) of checking by `qstat`. Default: 3 seconds
 	--lines         <int> Number of lines to form a job. Default: 999999
 	--prefix        <str> The prefix tag for qsubed jobs. Default: 'work'
-	--nsub          <int>
-	
+	--nsub          <int> Max qsub times for a job. Default: 1
+	--verbose       Show the progress.
 	--help
 
 Developed by: Yuchen Li <ycli1995\@outlook.com>
@@ -36,30 +36,26 @@ Getopt::Long::Configure("no_ignore_case", "no_auto_abbrev", "bundling_override",
 
 my $COMPLETE_STR = "This-Work-is-Completed!";
 
-my %RUNNING_JOBS;  # job_id => shell_name
-my %QSUB_INFO;
+my $RUNNING_JOBS = {};  # job_id => shell_name
+my $QSUB_INFO = {};
 
 END { 
 	&kill_all_running_jobs(); 
 }
 
-$SIG{INT} = sub {
-	print "\nInterupted. \nWait for killing all running jobs.\n";
-	&kill_all_running_jobs();
-	exit 1;
-};
-
-$SIG{TERM} = sub {
-	print "\nTerminated. \nWait for killing all running jobs.\n";
-	&kill_all_running_jobs();
-    exit 1;
-};
+for my $sig (qw/TERM INT KILL/) {
+	$SIG{$sig} = sub {
+		print "\nCaught SIG$sig.\nWait for killing all running jobs.\n";
+		&kill_all_running_jobs();
+		exit 1;
+	};
+}
 
 &qsub_main(@ARGV);
 
 # Sub-routines ############################
-sub default_options {
-	my %opts = (
+sub default_qsub_opts {
+	return {
 		qsub => 'qsub',
 		queue => "all.q",
 		resource => "mf=10G",
@@ -69,17 +65,17 @@ sub default_options {
 		lines => 999999,
 		prefix => "work",
 		nsub => 1,
-	);
-	return %opts;
+	};
 }
 
 sub qsub_main {
 	die $USAGE unless @_;
 
-	my %opts;
+	my $opts = {};
+
 	GetOptionsFromArray(
 		\@_,
-		\%opts,
+		$opts,
 		'qsub=s',
 		'queue=s',
 		'resource=s',
@@ -88,54 +84,61 @@ sub qsub_main {
 		'maxjob=i',
 		'prefix=s',
 		'nsub=i',
+		'verbose',
 		'help',
 	) or die $USAGE;
 
 	my @invalid_opts = grep { /^-/ } @_;
 	die "Invalid options: " . join(", ", @invalid_opts) . "\n\n" . $USAGE if (@invalid_opts);
-	die $USAGE if (@_ == 0 || $opts{help});
+
+	die $USAGE if ($opts->{help});
 
 	my $shell_file = shift;
 	die $USAGE unless $shell_file;
 
 	## Get default options
-	my %default_opts = default_options();
-	&get_default_options(\%opts, \%default_opts);
-
-	$opts{nsub} = 1 if ($opts{nsub} < 1);
-	$opts{maxjob} = 1 if ($opts{maxjob} < 1);
-
-	## Get shell commands
-	$QSUB_INFO{shell_file} = real_path($shell_file, 1);
-	$QSUB_INFO{outdir} = $QSUB_INFO{shell_file} . ".$$.qsub";
-	my @shells = split_shell($QSUB_INFO{shell_file}, $QSUB_INFO{outdir}, $opts{lines}, $opts{prefix});
-
-	my $n_shells = scalar @shells;
-	$opts{maxjob} = $n_shells if ($opts{maxjob} > $n_shells);
+	my $default_opts = default_qsub_opts();
+	get_default_options($opts, $default_opts);
 
 	## Init qsub
-	$QSUB_INFO{shells} = \@shells;
-	$QSUB_INFO{opts} = \%opts;
-	$QSUB_INFO{ALL_JOBS} = { map { $_ => [] } @{$QSUB_INFO{shells}} };  # shell_name => [ job_id ]
-	$QSUB_INFO{COUNT_JOBS} = { map { $_ => 0 } @{$QSUB_INFO{shells}} };  # shell_name => nsub
-	$QSUB_INFO{OK_JOBS} = {};
+	time_log("Initiate qsub") if $opts->{verbose};
+	$QSUB_INFO->{shell_file} = real_path($shell_file, {must_work => 1});
+	$QSUB_INFO->{outdir} = "$QSUB_INFO->{shell_file}.$$.qsub";
+	$QSUB_INFO->{shells} = split_shell($QSUB_INFO->{shell_file}, $QSUB_INFO->{outdir}, $opts);
+	$QSUB_INFO->{ALL_JOBS} = { map { $_ => [] } @{$QSUB_INFO->{shells}} };  # shell_name => [ job_id1, job_id2, ... ]
+	$QSUB_INFO->{COUNT_JOBS} = { map { $_ => 0 } @{$QSUB_INFO->{shells}} };  # shell_name => nsub
+	$QSUB_INFO->{OK_JOBS} = {};
+
+	normal_qsub_opts($QSUB_INFO, $opts);
 
 	## Run qsub
-	run_qsub_parallel(\%QSUB_INFO, \%RUNNING_JOBS);
+	time_log("Run qsub jobs parallely") if $opts->{verbose};
+	run_qsub_parallel($QSUB_INFO, $RUNNING_JOBS, $opts);
 
 	## Summary
-	summary_qsub(\%QSUB_INFO);
+	time_log("Summary qsub") if $opts->{verbose};
+	summary_qsub($QSUB_INFO);
+}
+
+sub normal_qsub_opts {
+	my ($info, $opts) = @_;
+
+	$opts->{nsub} = 1 if ($opts->{nsub} < 1);
+	$opts->{maxjob} = 1 if ($opts->{maxjob} < 1);
+
+	my $n_shells = scalar @{$info->{shells}};
+	$opts->{maxjob} = $n_shells if ($opts->{maxjob} > $n_shells);
 }
 
 sub kill_all_running_jobs {
-	my @jobs = keys %RUNNING_JOBS;
+	my @jobs = keys %{$RUNNING_JOBS};
 	return unless @jobs;
 	
 	my $cmd = "qdel " . join(" ", @jobs);
 	print $cmd . "\n";
 	system($cmd);
 
-	delete @RUNNING_JOBS{@jobs};
+	delete @{$RUNNING_JOBS}{@jobs};
 }
 
 sub summary_qsub {
@@ -144,20 +147,14 @@ sub summary_qsub {
 	my @fail_cmds;
 	foreach (@{$QSUB_INFO->{shells}}) {
 		next if (exists $QSUB_INFO->{OK_JOBS}->{$_});
-
-		my $shfile = $QSUB_INFO->{outdir} . "/" . $_;
-		my @cmds = read_shell($shfile);
-		@fail_cmds = (@fail_cmds, @cmds);
+		my $cmds = read_shell("$QSUB_INFO->{outdir}/$_");
+		push @fail_cmds, @{$cmds};
 	}
 
-	unless (@fail_cmds) {
-		print "All jobs finished!\n";
-		return;
-	}
+	return unless (@fail_cmds);
 
-	my $fail_shell = $QSUB_INFO->{shell_file} . ".$$.fail.sh";
-
-	write_shell($fail_shell, join("\n", @fail_cmds));
+	my $fail_shell = "$QSUB_INFO->{shell_file}.$$.fail.sh";
+	write_shell(\@fail_cmds, $fail_shell, {for_qsub => 0});
 
 	print "Some jobs failed.\n";
 	print "qsub: " . $QSUB_INFO->{outdir} . "/\n";
@@ -166,44 +163,37 @@ sub summary_qsub {
 }
 
 sub run_qsub_parallel {
-	my $QSUB_INFO = shift;
-	my $RUNNING_JOBS_HASH = shift;
-
-	my $interval = $QSUB_INFO->{opts}->{interval};
-	my $maxjob = $QSUB_INFO->{opts}->{maxjob};
+	my ($QSUB_INFO, $RUNNING_JOBS, $opts) = @_;
 
 	while (1) {
-		sleep $interval;
+		sleep $opts->{interval};
 
-		update_running_qsub($QSUB_INFO, $RUNNING_JOBS_HASH);
+		update_running_qsub($QSUB_INFO, $RUNNING_JOBS);
 		my $n_remain = scalar(keys %{$QSUB_INFO->{COUNT_JOBS}});
-
 		last unless ($n_remain);
 
-		$maxjob = $n_remain if ($maxjob > $n_remain);
+		$opts->{maxjob} = $n_remain if ($opts->{maxjob} > $n_remain);
+		my $n_running = scalar keys %{$RUNNING_JOBS};
+		next unless ($n_running < $opts->{maxjob});
 
-		my $n_running = scalar keys %{$RUNNING_JOBS_HASH};
-		next unless ($n_running < $maxjob);
-
-		fill_running_qsub($QSUB_INFO, $RUNNING_JOBS_HASH, $maxjob);
+		fill_running_qsub($QSUB_INFO, $RUNNING_JOBS, $opts);
 	}	
 }
 
 sub update_running_qsub {
-	my $QSUB_INFO = shift;
-	my $RUNNING_JOBS_HASH = shift;  # job_id => shell_name
+	my ($QSUB_INFO, $RUNNING_JOBS) = @_;  # job_id => shell_name
 
-	my @running_jobs = keys %{$RUNNING_JOBS_HASH};
+	my @running_jobs = keys %{$RUNNING_JOBS};
 	foreach (@running_jobs) {
-		my %info = (job_id => $_);
-		update_qstat_info(\%info);
+		my $info = { job_id => $_ };
+		update_qstat_info($info);
 
 		# Ignore running job.
-		next if ($info{exists});
+		next if ($info->{exists});
 
 		# Delete job that doesn't exist.
-		my $shell_name = $RUNNING_JOBS_HASH->{$_};
-		delete $RUNNING_JOBS_HASH->{$_};
+		my $shell_name = $RUNNING_JOBS->{$_};
+		delete $RUNNING_JOBS->{$_};
 
 		# Only update shell state for this job id (OK or fail?)
 		updata_shell_result($QSUB_INFO, $shell_name);
@@ -211,107 +201,91 @@ sub update_running_qsub {
 }
 
 sub fill_running_qsub {
-	my $QSUB_INFO = shift;
-	my $RUNNING_JOBS_HASH = shift;  # job_id => shell_name
-	my $maxjob = shift;
-
-	my $nsub = $QSUB_INFO->{opts}->{nsub};
+	my ($QSUB_INFO, $RUNNING_JOBS, $opts) = @_;  # %RUNNING_JOBS: job_id => shell_name
 
 	my @shells = sort keys %{$QSUB_INFO->{COUNT_JOBS}};
 	foreach (@shells) {
-		last unless (keys %{$RUNNING_JOBS_HASH} < $maxjob);
+		last unless (keys %{$RUNNING_JOBS} < $opts->{maxjob});
 
 		# Check if this shell is completed or failed.
 		updata_shell_result($QSUB_INFO, $_);
 		next if (exists $QSUB_INFO->{OK_JOBS}->{$_});  # Already ok
 		next unless (exists $QSUB_INFO->{COUNT_JOBS}->{$_});  # Cannot run anymore
 
-		if ($QSUB_INFO->{COUNT_JOBS}->{$_} < $nsub) {
-			next if (is_running_shell($QSUB_INFO, $RUNNING_JOBS_HASH, $_));  # Already running
+		if ($QSUB_INFO->{COUNT_JOBS}->{$_} < $opts->{nsub}) {
+			next if (is_running_shell($QSUB_INFO, $RUNNING_JOBS, $_));  # Already running
 
-			qsub_a_shell($QSUB_INFO, $RUNNING_JOBS_HASH, $_);
+			time_log("Submit $_") if ($opts->{verbose});
+			qsub_a_shell($QSUB_INFO, $RUNNING_JOBS, $_, $opts);
 			next;
-		}	
+		}
 		delete $QSUB_INFO->{COUNT_JOBS}->{$_};
 	}
 }
 
 sub is_running_shell {
-	my $QSUB_INFO = shift;
-	my $RUNNING_JOBS_HASH = shift;
-	my $shell = shift;
+	my ($QSUB_INFO, $RUNNING_JOBS, $shell) = @_;
 
-	update_running_qsub($QSUB_INFO, $RUNNING_JOBS_HASH);
+	update_running_qsub($QSUB_INFO, $RUNNING_JOBS);
 
-	my @running_jobs = keys %{$RUNNING_JOBS_HASH};
-	foreach (@running_jobs) {
-		return 1 if ($shell eq $RUNNING_JOBS_HASH->{$_});
+	foreach (keys %{$RUNNING_JOBS}) {
+		return 1 if ($shell eq $RUNNING_JOBS->{$_});
 	}
 	return 0;
 }
 
 sub qsub_a_shell {
-	my $QSUB_INFO = shift;
-	my $RUNNING_JOBS_HASH = shift;
-	my $shell = shift;
+	my ($QSUB_INFO, $RUNNING_JOBS, $shell, $opts) = @_;
 
 	my $shfile = $QSUB_INFO->{outdir} . "/" . basename($shell);
-	my %info = qsub_job($shfile, %{$QSUB_INFO->{opts}});
-	my $job_id = $info{job_id};
+	my $job_id = qsub_job($shfile, $opts);
 
-	$RUNNING_JOBS_HASH->{$job_id} = $shell;
-
+	$RUNNING_JOBS->{$job_id} = $shell;
 	push @{$QSUB_INFO->{ALL_JOBS}->{$shell}}, $job_id;
 	$QSUB_INFO->{COUNT_JOBS}->{$shell} += 1;
 }
 
 sub updata_shell_result {
-	my $QSUB_INFO = shift;
-	my $shell_name = shift;
+	my ($QSUB_INFO, $shell) = @_;
 
-	my $ok = &check_shell_complete($QSUB_INFO->{outdir}, $shell_name);
+	my $ok = check_shell_complete($QSUB_INFO->{outdir}, $shell);
 	return unless $ok;
 
-	#print $shell_name . " ok.\n";
-	$QSUB_INFO->{OK_JOBS}->{$shell_name} = $QSUB_INFO->{ALL_JOBS}->{$shell_name};
-	delete $QSUB_INFO->{COUNT_JOBS}->{$shell_name};
+	# $shell is already ok.
+	$QSUB_INFO->{OK_JOBS}->{$shell} = $QSUB_INFO->{ALL_JOBS}->{$shell};
+	delete $QSUB_INFO->{COUNT_JOBS}->{$shell};
 }
 
 # shell output
 sub check_shell_complete {
-	my $indir = shift;
-	my $shell_name = shift;
+	my ($indir, $shell) = @_;
 
-	my $oe = &find_shell_output($indir, $shell_name);
-	my @o = @{$oe->{o}};
-	foreach (@o) {
+	my $oe = find_shell_output($indir, $shell);
+	foreach (@{$oe->{o}}) {
 		my $ofile = $indir . "/" . basename($_);
-		return 1 if &check_o_complete($ofile);
+		return 1 if check_o_complete($ofile);
 	}
 	return 0;
 }
 
 sub check_o_complete {
 	my $ofile = shift;
-
-	$ofile = real_path($ofile, 1);
+	$ofile = real_path($ofile, {must_work => 1});
 
 	my $out = 0;
 	open my $fh, "<", $ofile or die $!;
 	while (<$fh>) {
 		chomp;
-		#print $_ . "\n";
-		if ($_ eq $COMPLETE_STR) {
-			$out = 1;
-			last;
-		}
+		next unless ($_ eq $COMPLETE_STR);
+		$out = 1;
+		last;
 	}
+	close $fh;
 	return $out;
 }
 
 sub find_shell_output {
-	my $indir = shift;
-	my $shell_name = shift;
+	my ($indir, $shell_name) = @_;
 
 	my $target = basename($shell_name);
 
@@ -323,170 +297,129 @@ sub find_shell_output {
 	foreach (@all_files) {
 		my $file = $_;
 		$file =~ s/[0-9]+$//g;
-		push(@o, $indir . "/" . $_) if ($file eq $target . ".o");
-		push(@e, $indir . "/" . $_) if ($file eq $target . ".e");
+		push(@o, $indir . "/" . $_) if ($file eq "$target.o");
+		push(@e, $indir . "/" . $_) if ($file eq "$target.e");
 	}
 	return { o => \@o, e => \@e };
 }
 
 # qsub
 sub update_qstat_info {
-	my $info_hash = shift;
+	my $info = shift;
+	check_ref($info, "HASH");
 
-	my $job_id = $info_hash->{job_id};
+	my $job_id = $info->{job_id};
 	die "No 'job_id'." unless defined $job_id;
 
 	my $stat = `qstat -j $job_id 2>&1`;
 	if ($stat =~ /do not exist/) {
-		$info_hash->{exists} = 0;
+		$info->{exists} = 0;
 		return;
 	}
-	$info_hash->{exists} = 1;
-	my @lines = split /\n/, $stat;
-	my $id;
-	foreach my $line (@lines) {
-		$id = $1 if ($line =~ /^([^:]+):(.*)/);
-		next unless defined $id;
-
-		$id =~ s/\s+/_/g;
-		$line =~ s/^[^:]+://;
-		$line =~ s/^\s*//;
-		$info_hash->{$id} .= $line;
-	}
+	$info->{exists} = 1;
 }
 
 sub qsub_job {
-	my $shfile = shift;
-	my %opts = @_;
+	my ($shfile, $opts) = @_;
 
-	$shfile = real_path($shfile, 1);
+	$opts //= {};
+
+	$shfile = real_path($shfile, {must_work => 1});
+
 	my $shdir = dirname($shfile);
-
-	my $qcmd = qsub_cmd(%opts);
+	my $qcmd = qsub_cmd($opts);
 
 	my $job_out = `$qcmd -e $shdir -o $shdir $shfile`;
 	my $job_id = $1 if ($job_out =~ /Your job (\d+)/);
-	die "Fetching job id failed: \n$job_out" if ($job_id eq '0' || !defined $job_id);
+	stop("Fetching job id failed: \n$job_out") if ($job_id eq '0' || !defined $job_id);
 
-	my %info = (job_id => $job_id);
-	return %info;
+	return $job_id;
 }
 
 sub qsub_cmd {
-	my %opts = @_;
+	my $opts = shift;
 
-	my %default_opts = &default_options();
-	&get_default_options(\%opts, \%default_opts);
+	$opts //= {};
 
-	my @keys_required = qw/qsub queue resource ppn/;
-	&check_keys_required(\%opts, @keys_required);
+	my $default_opts = default_qsub_opts();
+	get_default_options($opts, $default_opts);
 
-	my $cmd = "$opts{qsub} -q $opts{queue} -l $opts{resource} -cwd -S /bin/bash -V -sync no -pe smp $opts{ppn} ";
+	&check_keys_required($opts, qw/qsub queue resource ppn/);
+
+	my $cmd = "$opts->{qsub} -q $opts->{queue} -l $opts->{resource} -cwd -S /bin/bash -V -sync no -pe smp $opts->{ppn} ";
 	return $cmd;
 }
 
 # Shell
 sub read_shell {
-	my $file = shift;
-	my $lines = shift;
+	my ($file, $opts) = @_;
 
-	$lines //= 999999;
+	$opts //= {};
+	$opts->{lines} //= 999999;
 
-	$file = real_path($file, 1);
+	$file = real_path($file, {must_work => 1});
 
-	my @cmds;
-	my $n_line = 0;
-	my $cmd = "";
-
+	my $cmds = [];
+	my $cmd = [];
 	open IN, "<", $file or die $!;
 	while (<IN>) {
 		chomp;
-		my $add = &filter_cmd($_);
+		my $add = filter_cmd($_);
 		next unless (defined $add);
 
-		$cmd .= $add . "\n";
-		$n_line++;
-		next unless ($n_line == $lines);
+		push @{$cmd}, $add;
+		next unless (@{$cmd} == $opts->{lines});
 
-		push @cmds, $cmd;
-		$n_line = 0;
-		$cmd = "";
+		push @{$cmds}, join("\n", @{$cmd});
+		$cmd = [];
 	}
 	close IN;
-	push @cmds, $cmd unless $cmd eq '';
-	return @cmds;
+	push @{$cmds}, join("\n", @{$cmd}) unless (@{$cmd} == 0);
+	return $cmds;
 }
 
 sub split_shell {
-	my $file = shift;
-	my $outdir = shift;
-	my $lines = shift;
-	my $pfx = shift;
+	my ($file, $outdir, $opts) = @_;
 
-	$lines //= 999999;
-	$pfx //= "work";
+	$opts //= {};
+	$opts->{lines} //= 999999;
+	$opts->{pfx} //= "work";
 
-	$file = real_path($file, 1);
-	
-	my $script_pfx = join("\n", "#!/bin/bash", "set -e", "echo \$HOSTNAME");
-	my $script_sfx = "echo " . $COMPLETE_STR;
+	my $cmds = read_shell($file, $opts);
 
-	my @shells;
-
-	my $n_line = 0;
+	my $shells = [];
 	my $job_id = "0001";
-	my $cmd = "";
-	my $pattern = "%s/%s_%s.sh";
-
-	open IN, "<", $file or die $!;
-	while (<IN>) {
-		chomp;
-		my $add = &filter_cmd($_);
-		next unless (defined $add);
-	
-		$cmd .= $add . "\n";
-		$n_line++;
-		next unless ($n_line == $lines);
-
-		# Write $cmd to target
-		my $outfile = sprintf($pattern, $outdir, $pfx, $job_id);
+	my $cmd;
+	foreach (@{$cmds}) {
+		my $outfile = "$outdir/$opts->{pfx}_${job_id}.sh";
 		make_path($outdir);
-		write_shell($cmd, $outfile);
-		
-		# Record target shell
-		push @shells, basename($outfile);
-
-		# Refresh
+		write_shell([$_], $outfile);
+		push @{$shells}, basename($outfile);
 		$job_id++;
-		$n_line = 0;
-		$cmd = "";
 	}
-	close IN;
-	return @shells if ($cmd eq "");
-
-	my $outfile = sprintf($pattern, $outdir, $pfx, $job_id);
-	make_path($outdir);
-	write_shell($cmd, $outfile);
-	push @shells, basename($outfile);
-
-	return @shells;
+	return $shells;
 }
 
 sub write_shell {
-	my $cmd = shift;
-	my $outfile = shift;
-	my $for_qsub = shift;
+	my ($cmds, $outfile, $opts) = @_;
 
-	$for_qsub //= 1;
+	$opts //= {};
+	$opts->{for_qsub} //= 1;
 
-	my $script_pfx = join("\n", "#!/bin/bash", "set -e", "echo \$HOSTNAME");
+	my $script_pfx = "#!/bin/bash\nset -e";
 	my $script_sfx = "";
 
-	$script_pfx .= "\necho \$HOSTNAME" if $for_qsub;
-	$script_sfx = "echo " . $COMPLETE_STR if $for_qsub;
-	
+	if ($opts->{for_qsub}) {
+		$script_pfx .= "\necho \$HOSTNAME";
+		$script_sfx = "echo  $COMPLETE_STR";
+	}
+
 	open OUT, '>', $outfile or stop($!);
-	print OUT join("\n", $script_pfx, $cmd, $script_sfx) . "\n";
+	print OUT "$script_pfx\n";
+	foreach (@{$cmds}) {
+		print OUT "$_\n";
+	}
+	print OUT "$script_sfx\n" unless ($script_sfx eq "");
 	close OUT;
 
 	return basename($outfile);
@@ -506,17 +439,19 @@ sub filter_cmd {
 
 # PATH
 sub real_path {
-	my $path = shift;
-	my $must_work = shift;
+	my ($path, $opts) = @_;
 
-	$must_work //= 0;
+	$opts //= {};
+	$opts->{must_work} //= 0;
 
 	my $norm_path = abs_path($path);
-	
+	if (defined $norm_path) {
+		$norm_path = undef unless (-e $norm_path);
+	}
 	return $norm_path if defined $norm_path;
 
 	$path =~ s/\/+$//g;
-	return $path unless $must_work;
+	return $path unless $opts->{must_work};
 
 	stop('No such file or directory: ', $path);
 }
@@ -524,23 +459,46 @@ sub real_path {
 # Options
 sub check_keys_required {
 	my $opts = shift;
-	my @keys_arr = @_;
-	foreach (@keys_arr) {
+	foreach (@_) {
 		next unless (!defined $opts->{$_} || $opts->{$_} eq '');
 		stop("Required key '$_' not found in the input hash.");
 	}
 }
 
 sub get_default_options {
-	my $opts = shift;
-	my $default_opts = shift;
+	my ($opts, $default_opts) = @_;
 	foreach (keys %{$default_opts}) {
 		$opts->{$_} //= $default_opts->{$_};
 	}
 }
 
 # DEBUG
+sub check_ref {
+	my ($x, $ref) = @_;
+	return if (ref $x eq $ref);
+	stop("Require a ref of '$ref'.");
+}
+
 sub stop {
 	confess "ERROR:\n @_\n";
+}
+
+sub ftime {
+	my ($no_space) = @_;
+	$no_space //= 0;
+
+	my ($sec, $min, $hour, $day, $mon, $year, $wday, $yday, $isdst) = localtime();
+	$year += 1900;
+	$mon += 1;
+
+	my $pattern = $no_space ? "%d\-%02d\-%02d %02d:%02d:%02d" : "%d\-%02d\-%02d-%02d-%02d-%02d";
+
+	my $ftime = sprintf($pattern, $year, $mon, $day, $hour, $min, $sec);
+	return $ftime;
+}
+
+sub time_log {
+	my $time = "[" . ftime(1) . "]";
+	print "$time @_\n";
 }
 
