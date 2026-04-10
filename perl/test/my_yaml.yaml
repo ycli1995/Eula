@@ -1,0 +1,51 @@
+
+# `int` should be treated as `double`
+int1: [ 1, 2, 30 ]
+int2:
+- 10
+- 20
+- 30
+int3: [ 2, TRUE, 3, False ]  ## mix with logical (TRUE => 1, FALSE => 0)
+int4: [ 2, A, 3 ]  ## mix with character
+
+# `numeric`
+num1: [ 0, 1, 2 ]
+num2:
+- 10
+- .inf  ## mix with infinite
+- 20
+num3: [ 1, A, 2.5, .inf ]  ## mix with character (`.inf` will turn to `"Inf"`)
+num4:
+- 10
+- True  ## mix with logical (TRUE => 1)
+- 20
+
+# `character`
+char1: [ 'A', 1 ]  ## mix with numbers
+char2: [ B, 3, FALSE ]  ## mix with logical
+char3: [ A, BB, C ]
+
+# `logical`
+logi1:
+- false
+logi2: [ TRUE, False, True ]
+logi3: [ yes, no, TRUE ]
+
+# `list`
+list1:
+  - [ 100, .inf ]
+  - [ -.inf, 10 ]
+list2:  ## different length
+  a1: true
+  a2: [ 10, "B" ]
+list3:
+  sub1:
+    - [ 200, .inf, 300]
+  sub2:  ## scalars with keys (Don't unlist when `simplify = TRUE`)
+    a: A
+    b: TRUE
+    c: 3
+  sub3:  ## scalars without keys (unlist when `simplify = TRUE`)
+    - B
+    - False  ## `False` will turn to `"FALSE"`
+    - 4
