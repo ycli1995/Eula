@@ -8,7 +8,17 @@ use Term::ANSIColor qw(:constants);
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(check_keys_required deref excu_shell ftime message stop time_log warning);
+our @EXPORT = qw/
+	check_keys_required 
+	deref 
+	excu_shell 
+	ftime 
+	message 
+	require_opt 
+	stop 
+	time_log 
+	warning
+/;
 
 sub time_log {
 	my $time = "[" . ftime() . "]";
@@ -64,6 +74,18 @@ sub check_keys_required {
 		next unless (!defined $opts->{$_} || $opts->{$_} eq '');
 		stop("Required key '$_' not found in the input hash.\n");
 	}
+}
+
+sub require_opt {
+    my ($opts, $key) = @_;
+
+    stop("<\$opts> must be a hashref") unless (ref($opts) eq 'HASH');
+
+    return $opts->{$key} if (exists $opts->{$key});
+
+    my $func = (split /::/, (caller(1))[3])[-1];
+
+    stop("<\$opts->{$key}> is required in function <$func>");
 }
 
 sub message {
