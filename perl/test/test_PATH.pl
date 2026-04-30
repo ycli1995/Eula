@@ -22,7 +22,9 @@ print "\n";
 
 print "TEST real_path('xxx/yyy', {must_work => 1})\n";
 make_path("xxx");
-rm_paths("test_make_path", "xxx");
+rm_paths("test_make_path/*", "xxx");
+print real_path('test_make_path', {must_work => 1}) . "\n";
+rm_paths("test_make_path/");
 print real_path('xxx/yyy', {must_work => 1}) . "\n";
 print "\n";
 
