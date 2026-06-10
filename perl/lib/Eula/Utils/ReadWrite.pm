@@ -3,6 +3,9 @@ package Eula::Utils::ReadWrite;
 use strict;
 use warnings;
 
+use File::Basename qw/dirname/;
+
+use lib dirname(__FILE__)."/../../vendor/lib/perl5";
 use YAML;
 
 use Eula::Utils::DEBUG qw/check_ref get_omits stop/;
