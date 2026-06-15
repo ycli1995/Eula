@@ -1,0 +1,20 @@
+body {
+  overflow: visible;
+  position: relative;
+  background-color: #ffffff;
+}
+.note {
+  color: #f00;
+}
+.tc {
+  text-align: center;
+}
+table {
+  width: 200px;
+  min-height: 25px;
+  line-height: 25px;
+  text-align: center;
+  border-collapse: collapse;
+  border-color: #e4e9eb;
+  border-top: 4px #009933 solid;
+}
