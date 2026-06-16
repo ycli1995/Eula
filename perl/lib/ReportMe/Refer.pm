@@ -51,8 +51,11 @@ sub _check_ref {
 sub refer_order {
     my ($self, $id) = @_;
     $self->_check_ref($id);
+
+    my $i = 0;
     for my $n (@{$self->{names}}) {
-        return $n if ($n eq $id);
+        $i += 1;
+        return $i if ($n eq $id);
     }
 }
 
