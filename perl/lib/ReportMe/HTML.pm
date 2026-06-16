@@ -144,7 +144,6 @@ sub require_content_config {
     return $content_config->{$key};
 }
 
-
 sub get_src {
     my ($self, $type, $key) = @_;
     return $self->{src}->{$type}->{$key} || "";
@@ -201,6 +200,14 @@ my %IMAGE = (
     CHECK => [ qw/no.png yes.png warn.png/ ],
     HELP => [ qw/help.png/ ],
 );
+
+sub get_src_keys {
+    my ($self, $type) = @_;
+    return %IMAGE if ($type eq "image");
+    return %CSS if ($type eq "css");
+    return %JS if ($type eq "js");
+    stop("src type $type is invalid. Must be image, css, or js.");
+}
 
 sub _set_default_src {
     my ($self) = @_;
