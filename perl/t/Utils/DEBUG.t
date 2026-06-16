@@ -1,9 +1,10 @@
 use strict;
 use warnings;
-use Test::More tests => 12;
+use Test::More tests => 14;
 use FindBin qw($Bin);
 use lib "$Bin/../../lib";
 use Eula::Utils::DEBUG;
+use Eula::Catalog;
 
 # Test ftime
 subtest 'ftime' => sub {
@@ -287,6 +288,41 @@ subtest 'message' => sub {
 
     select($old_fh);
     close $fh;
+};
+
+# Test is_instance_of
+subtest 'is_instance_of' => sub {
+    plan tests => 4;
+
+    my $catalog = Eula::Catalog->new(undef, { 
+        file => 'test.txt', 
+        name => 'Test' 
+    });
+    ok(is_instance_of($catalog, 'Eula::Catalog'), 'is_instance_of returns true for correct class');
+    ok(!is_instance_of($catalog, 'Eula::DIR'), 'is_instance_of returns false for wrong class');
+
+    my $non_object = { key => 'value' };
+    ok(!is_instance_of($non_object, 'Eula::Catalog'), 'is_instance_of returns false for hashref');
+
+    ok(!is_instance_of(undef, 'Eula::Catalog'), 'is_instance_of returns false for undef');
+};
+
+# Test require_class
+subtest 'require_class' => sub {
+    plan tests => 3;
+
+    my $catalog = Eula::Catalog->new(undef, { 
+        file => 'test.txt', 
+        name => 'Test' 
+    });
+    my $result = require_class($catalog, 'Eula::Catalog');
+    is($result, undef, 'require_class returns undef for correct class');
+
+    eval { require_class($catalog, 'Eula::DIR'); };
+    like($@, qr/Expected a reference of class/, 'require_class dies for wrong class');
+
+    eval { require_class({ key => 'value' }, 'Eula::Catalog'); };
+    like($@, qr/Expected a reference of class/, 'require_class dies for non-object');
 };
 
 done_testing();

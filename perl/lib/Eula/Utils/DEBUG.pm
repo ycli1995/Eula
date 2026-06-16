@@ -3,6 +3,7 @@ package Eula::Utils::DEBUG;
 use strict;
 use warnings;
 
+use Scalar::Util qw(blessed);
 use Carp qw(carp confess);
 use Term::ANSIColor qw(:constants);
 
@@ -15,9 +16,11 @@ our @EXPORT = qw(
     excu_shell
     ftime
     get_omits
+    is_instance_of
     message
     omit_array
     omit_array_by_ranges
+    require_class
     require_opt
     stop
     time_log
@@ -98,6 +101,19 @@ sub require_opt {
     my $func = (split /::/, (caller(1))[3])[-1];
 
     stop("<\$opts->{$key}> is required in function <$func>");
+}
+
+sub is_instance_of {
+    my ($obj, $class) = @_;
+    return blessed($obj) && $obj->isa($class);
+}
+
+sub require_class {
+    my ($obj, $class) = @_;
+    return if (is_instance_of($obj, $class));
+
+    my $func = (split /::/, (caller(1))[3])[-1];
+    stop("Expected a reference of class '$class' in function <$func>");
 }
 
 sub message {
