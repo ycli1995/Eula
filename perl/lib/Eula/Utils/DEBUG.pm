@@ -21,6 +21,7 @@ our @EXPORT = qw(
     omit_array
     omit_array_by_ranges
     require_class
+    require_defined_opt
     require_opt
     stop
     time_log
