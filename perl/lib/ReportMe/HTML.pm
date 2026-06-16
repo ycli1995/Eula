@@ -75,6 +75,8 @@ sub _new_root_section {
     $self->{section} = [];
     $self->{split_line} = "";
 
+    $self->{nonlazy} = $opts->{'-nonlazy'} || 0;
+
     $self->_set_default_src();
 }
 
