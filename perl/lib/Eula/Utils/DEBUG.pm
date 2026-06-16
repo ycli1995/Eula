@@ -103,6 +103,20 @@ sub require_opt {
     stop("<\$opts->{$key}> is required in function <$func>");
 }
 
+sub require_defined_opt {
+    my ($opts, $key) = @_;
+
+    check_ref($opts, "HASH");
+
+    stop("<\$opts> must be a hashref") unless (ref($opts) eq 'HASH');
+
+    return $opts->{$key} if (defined $opts->{$key});
+
+    my $func = (split /::/, (caller(1))[3])[-1];
+
+    stop("<\$opts->{$key}> is required to be defined in function <$func>");
+}
+
 sub is_instance_of {
     my ($obj, $class) = @_;
     return blessed($obj) && $obj->isa($class);
