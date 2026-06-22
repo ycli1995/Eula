@@ -1,0 +1,6 @@
+
+source("pkg_load.R")
+
+pkg_conf <- yaml::yaml.load_file("Eula_pkgs.yaml")
+
+load_pkg("Eula.utils", pkg_conf = pkg_conf)
