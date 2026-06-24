@@ -8,6 +8,8 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Imports: 
+    Matrix,
+    MatrixGenerics,
     xgboost
 Suggests: 
     testthat (>= 3.0.0)
