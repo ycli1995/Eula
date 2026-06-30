@@ -1,4 +1,5 @@
 #' @importFrom collapse fquantile
+#' @importFrom Eula.utils verboseMsg
 #' @export
 runMalignancy <- function(
   expr,
@@ -13,18 +14,21 @@ runMalignancy <- function(
   ref.data = NULL,
   ref.adj.mat = NULL,
   species = "human",
-  genome = "hg38"
+  genome = "hg38",
+  verbose = TRUE
 ) {
+  verboseMsg("Running `prepareCNV`")
   cnv.list <- prepareCNV(
     expr = expr,
     celltypes = celltypes,
     gene.chr = gene.chr,
     ref.data = ref.data,
     species = species,
-    genome = genome,
+    genome = genome
   )
   obs.anno <- cnv.list$cell.anno[colnames(expr), , drop = FALSE]
   ref.anno <- cnv.list$cell.anno[cnv.list$ref.cells, , drop = FALSE]
+  verboseMsg("Running `runCNV`")
   cnv.expr <- runCNV(
     expr = cnv.list$expr,
     chr.data = cnv.list$gene.chr,
@@ -37,14 +41,17 @@ runMalignancy <- function(
   )
 
   if (is.null(ref.data)) {
+    verboseMsg("Get reference adjacency matrix")
     ref.adj.mat <- .get_adj_mat(species)
   }
+  verboseMsg("Running `getMalignScore` for reference cells")
   referScore.smooth <- getMalignScore(
     expr = cnv.expr,
     cells = cnv.list$ref.cells,
     method = "smooth",
     adjMat = ref.adj.mat
   )
+  verboseMsg("Running `getMalignScore` for observation cells")
   obserScore.smooth <- getMalignScore(
     expr = cnv.expr,
     cells = setdiff(colnames(cnv.expr), cnv.list$ref.cells),
@@ -56,10 +63,12 @@ runMalignancy <- function(
   referScore.smooth <- (referScore.smooth - low.refer) / (up.refer - low.refer)
   obserScore.smooth <- (obserScore.smooth - low.refer) / (up.refer - low.refer)
 
+  verboseMsg("Calculate threshold values")
   all.thres <- .get_bimodal_thres(c(referScore.smooth, obserScore.smooth))
   malign.thres <- .get_bimodal_thres(obserScore.smooth)
 
   ## malignancy type
+  verboseMsg("Assign malignancy type")
   if (!is.null(all.thres)) {
     malign.type <- rep("malignant", length(obserScore.smooth))
     if (!is.null(malign.thres)) {
@@ -74,6 +83,7 @@ runMalignancy <- function(
   names(malign.type) <- names(obserScore.smooth)
 
   ## add score and type to cell.annotation
+  verboseMsg("Add score and type to cell.annotation")
   obs.anno$Malign.score <- obserScore.smooth[rownames(obs.anno)]
   obs.anno$Malign.type <- malign.type[rownames(obs.anno)]
   ref.anno$Malign.score <- referScore.smooth[rownames(ref.anno)]
