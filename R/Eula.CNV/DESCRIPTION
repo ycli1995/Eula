@@ -12,6 +12,7 @@ Imports:
     dplyr,
     Matrix,
     MatrixGenerics,
+    stats,
     xgboost
 Suggests: 
     testthat (>= 3.0.0)

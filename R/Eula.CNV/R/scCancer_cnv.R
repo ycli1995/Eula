@@ -393,6 +393,7 @@ getMalignScore <- function(
   expr
 }
 
+#' @importFrom stats filter
 .smooth_one_cnv <- function(ori.data, window.size = 101) {
   half.window <- (window.size - 1) / 2
 
@@ -409,8 +410,8 @@ getMalignScore <- function(
 
   kernel.vec <- c(1:half.window, half.window + 1, half.window:1)
 
-  sum.data <- filter(pad.data, kernel.vec, sides = 2)
-  num.data <- filter(bool.data, kernel.vec, sides = 2)
+  sum.data <- stats::filter(pad.data, kernel.vec, sides = 2)
+  num.data <- stats::filter(bool.data, kernel.vec, sides = 2)
   sum.data <- sum.data[!is.na(sum.data)]
   num.data <- num.data[!is.na(num.data)]
 
