@@ -1,3 +1,272 @@
+#' @importFrom collapse fquantile
+#' @export
+runMalignancy <- function(
+  expr,
+  celltypes,
+  gene.chr = NULL,
+  cut.off = 0.1,
+  min.cell = 3,
+  window.size = 101,
+  center.method = "median",
+  sd.amplifier = 1,
+  adj.mat = NULL,
+  ref.data = NULL,
+  ref.adj.mat = NULL,
+  species = "human",
+  genome = "hg38"
+) {
+  cnv.list <- prepareCNV(
+    expr = expr,
+    celltypes = celltypes,
+    gene.chr = gene.chr,
+    ref.data = ref.data,
+    species = species,
+    genome = genome,
+  )
+  obs.anno <- cnv.list$cell.anno[colnames(expr), , drop = FALSE]
+  ref.anno <- cnv.list$cell.anno[cnv.list$ref.cells, , drop = FALSE]
+  cnv.expr <- runCNV(
+    expr = cnv.list$expr,
+    chr.data = cnv.list$gene.chr,
+    ref.cells = cnv.list$ref.cells,
+    cut.off = cut.off,
+    min.cell = min.cell,
+    window.size = window.size,
+    center.method = center.method,
+    sd.amplifier = sd.amplifier
+  )
+
+  if (is.null(ref.data)) {
+    ref.adj.mat <- .get_adj_mat(species)
+  }
+  referScore.smooth <- getMalignScore(
+    expr = cnv.expr,
+    cells = cnv.list$ref.cells,
+    method = "smooth",
+    adjMat = ref.adj.mat
+  )
+  obserScore.smooth <- getMalignScore(
+    expr = cnv.expr,
+    cells = setdiff(colnames(cnv.expr), cnv.list$ref.cells),
+    method = "smooth",
+    adjMat = adj.mat
+  )
+  up.refer <- fquantile(referScore.smooth, 0.995)
+  low.refer <- fquantile(referScore.smooth, 0.005)
+  referScore.smooth <- (referScore.smooth - low.refer) / (up.refer - low.refer)
+  obserScore.smooth <- (obserScore.smooth - low.refer) / (up.refer - low.refer)
+
+  all.thres <- .get_bimodal_thres(c(referScore.smooth, obserScore.smooth))
+  malign.thres <- .get_bimodal_thres(obserScore.smooth)
+
+  ## malignancy type
+  if (!is.null(all.thres)) {
+    malign.type <- rep("malignant", length(obserScore.smooth))
+    if (!is.null(malign.thres)) {
+      malign.type[obserScore.smooth < malign.thres] <- "nonMalignant"
+    }
+  } else {
+    malign.type <- rep("nonMalignant", length(obserScore.smooth))
+    if (!is.null(malign.thres)) {
+      malign.type[obserScore.smooth >= malign.thres] <- "malignant"
+    }
+  }
+  names(malign.type) <- names(obserScore.smooth)
+
+  ## add score and type to cell.annotation
+  obs.anno$Malign.score <- obserScore.smooth[rownames(obs.anno)]
+  obs.anno$Malign.type <- malign.type[rownames(obs.anno)]
+  ref.anno$Malign.score <- referScore.smooth[rownames(ref.anno)]
+  ref.anno$Malign.type <- "nonMalignant"
+
+  results <- list(
+    cnv.expr = cnv.expr,
+    obs.anno = obs.anno,
+    ref.anno = ref.anno,
+    gene.chr = gene.chr,
+    malign.thres = malign.thres,
+    all.thres = all.thres
+  )
+  results
+}
+
+.get_bimodal_thres <- function(scores) {
+  x.density <- density(scores)
+  d.x.density <- diff(x.density$y)
+  d.sign <- as.numeric(d.x.density > 0)
+
+  ext.pos <- which(d.sign[-1] - d.sign[-length(d.sign)] != 0)
+  ext.density <- x.density$y[ext.pos]
+  y.max <- max(ext.density)
+
+  if (length(ext.pos) >= 3) {
+    diff.ext.density <- abs(diff(ext.density))
+    all.ei <- seq_along(diff.ext.density)
+    all.ei2 <- all.ei + 1L
+    del.ix <- cbind(
+      all.ei[diff.ext.density > y.max * 0.001],
+      all.ei2[diff.ext.density > y.max * 0.001]
+    )
+    del.ix <- as.vector(del.ix)
+    sel.ix <- which(!(seq_along(ext.density) %in% unique(del.ix)))
+    ext.density <- ext.density[sel.ix]
+    ext.pos <- ext.pos[sel.ix]
+  }
+  if (length(ext.pos) < 3) {
+    return(NULL)
+  }
+
+  t.ext.density <- c(0, ext.density, 0)
+  ext.height <- cbind(
+    abs(diff(t.ext.density)[-1]),
+    abs(diff(t.ext.density)[-length(t.ext.density)])
+  )
+  ext.height <- MatrixGenerics::colMins(ext.height)
+  ext <- data.frame(x = ext.pos, y = ext.density, height = ext.height)
+  max.ix <- order(ext.density, decreasing = TRUE)
+  if (ext.height[max.ix[2]] / ext.height[max.ix[1]] <= 0.01) {
+    return(NULL)
+  }
+  cut.df <- ext[max.ix[2]:max.ix[1], , drop = FALSE]
+  threshold <- x.density$x[cut.df[which.min(cut.df$y), "x"]]
+  threshold
+}
+
+#' @importFrom dplyr %>% arrange
+prepareCNV <- function(
+  expr,
+  celltypes,
+  gene.chr = NULL,
+  ref.data = NULL,
+  species = "human",
+  genome = "hg38"
+) {
+  ## gene.chr
+  if (is.null(gene.chr)) {
+    gene.chr <- .get_chr_data(expr, species, genome)
+  }
+  rownames(gene.chr) <- gene.chr$EnsemblID
+  gene.chr$CHR <- as.factor(gene.chr$CHR)
+  gene.chr$C_START <- as.numeric(gene.chr$C_START)
+  gene.chr$C_STOP <- as.numeric(gene.chr$C_STOP)
+  gene.chr <- gene.chr %>% dplyr::arrange(CHR, C_START, C_STOP)
+
+  common.genes <- intersect(gene.chr$EnsemblID, rownames(expr))
+  if (length(common.genes) == 0) {
+    stop("No common genes between expr and gene.chr.\n")
+  }
+  expr <- expr[common.genes, , drop = FALSE]
+  gene.chr <- gene.chr[common.genes, , drop = FALSE]
+
+  ## cell.anno
+  cell.anno <- data.frame(
+    cellName = colnames(expr),
+    cellAnno = as.factor(celltypes),
+    stringsAsFactors = FALSE
+  )
+
+  ## reference.data
+  if (is.null(ref.data)) {
+    ref.data.file <- if (species == "human") {
+      "cnvRef_Data-HM.RDS"
+    } else if (species == "mouse") {
+      "cnvRef_Data-boneMarrow-MS.RDS"
+    } else {
+      stop("species must be 'human' or 'mouse'.")
+    }
+    ref.data <- readRDS(system.file(
+      "rds", ref.data.file,
+      package = packageName()
+    ))
+  }
+  ref.anno <- data.frame(
+    cellName = colnames(ref.data),
+    cellAnno = "Reference",
+    stringsAsFactors = FALSE
+  )
+  ref.cells <- colnames(ref.data)
+
+  ## combine data
+  com.genes <- intersect(rownames(expr), rownames(ref.data))
+  if (length(com.genes) == 0) {
+    stop("No common genes between expr and ref.data.\n")
+  }
+  ref.data <- ref.data[com.genes, , drop = FALSE]
+  expr <- expr[com.genes, , drop = FALSE]
+  expr <- cbind(expr, ref.data)
+  gene.chr <- gene.chr[com.genes, , drop = FALSE]
+
+  cell.anno <- rbind(cell.anno, ref.anno)
+  rownames(cell.anno) <- cell.anno$cellName
+
+  list(
+    expr.data = expr,
+    gene.chr = gene.chr,
+    cell.anno = cell.anno,
+    ref.cells = ref.cells
+  )
+}
+
+.get_chr_data <- function(
+  expr,
+  species = c("human", "mouse"),
+  genome = c("hg38", "hg19", "mm10")
+) {
+  species <- match.arg(species)
+  genome <- match.arg(genome)
+  if (species == "human") {
+    if (genome == "hg38") {
+      gene.chr.file <- system.file(
+        "txt", "gene-chr-hg38.txt",
+        package = packageName()
+      )
+    } else if (genome == "hg19") {
+      gene.chr.file <- system.file(
+        "txt", "gene-chr-hg19.txt",
+        package = packageName()
+      )
+    } else {
+      stop(genome, " is not allowed for 'human'.")
+    }
+  }
+  if (species == "mouse") {
+    if (genome == "mm10") {
+      gene.chr.file <- system.file(
+        "txt", "gene-chr-mm10.txt",
+        package = "scCancer"
+      )
+    } else {
+      stop(genome, " is not allowed for 'mouse'.\n")
+    }
+  }
+  gene.chr <- read.table(
+    gene.chr.file,
+    sep = "\t",
+    header = FALSE,
+    col.names = c("EnsemblID", "CHR", "C_START", "C_STOP"),
+    stringsAsFactors = FALSE
+  )
+  gene.chr
+}
+
+.get_adj_mat <- function(species = c("human", "mouse")) {
+  species <- match.arg(species)
+  if (species == "human") {
+    adj.mat.file <- system.file(
+      "rds", "cnvRef_SNN-HM.RDS",
+      package = packageName()
+    )
+  } else if (species == "mouse") {
+    adj.mat.file <- system.file(
+      "rds", "cnvRef_SNN-boneMarrow-MS.RDS",
+      package = packageName()
+    )
+  } else {
+    stop("species must be 'human' or 'mouse'.")
+  }
+  adj.mat <- readRDS(adj.mat.file)
+  adj.mat
+}
 
 #' @export
 runCNV <- function(
@@ -15,7 +284,11 @@ runCNV <- function(
   expr <- .anscombe_transform_cnv(expr)
   expr <- .log2p1_cnv(expr)
   expr <- .bound_expr_cnv(expr, thres = .get_avg_bounds(expr))
-  expr <- .smooth_by_chr_cnv(expr, chr.data, window.size = window.size)
+  expr <- .smooth_by_chr_cnv(
+    expr,
+    chr.data = chr.data,
+    window.size = window.size
+  )
   expr <- .center_expr_cnv(expr, center.method = center.method)
   expr <- .subtract_ref_expr_cnv(expr, ref.cells = ref.cells, inv.log = TRUE)
   expr <- .denoise_expr_cnv(expr, sd.amplifier = sd.amplifier)
@@ -23,6 +296,55 @@ runCNV <- function(
   expr
 }
 
+#' @importFrom collapse fquantile
+#' @importFrom Matrix nnzero
+#' @export
+getMalignScore <- function(
+  expr,
+  cells,
+  method = "smooth",
+  adjMat = NULL
+) {
+  cur.data <- expr[, cells, drop = FALSE]
+
+  if (is.null(adjMat) & method == "smooth") {
+    warning(
+      "`adjMat` is not provided, use 'direct' method instead.",
+      call. = FALSE, immediate. = TRUE
+    )
+    method <- "direct"
+  }
+  if (method == "direct") {
+    malignScore <- colSums((cur.data - 1)^2) / nrow(cur.data)
+    return(malignScore)
+  }
+
+  if (!is.null(adjMat)) {
+    adjMat <- as(adjMat, "CsparseMatrix")
+    adjMat <- adjMat[cells, cells, drop = FALSE]
+  }
+  thres <- collapse::fquantile(
+    adjMat@x,
+    1 - (nrow(adjMat) * 10 / Matrix::nnzero(adjMat))
+  )
+
+  indexes <- as.matrix(adjMat > thres)
+  tt <- 0.5 / (rowSums(indexes) - 1)
+  tt[is.infinite(tt)] <- 0
+
+  indexes <- indexes * tt
+  indexes <- indexes * (1 - diag(rep(1, nrow(indexes))))
+  diagValue <- rep(0.5, nrow(indexes))
+  diagValue[tt == 0] <- 1
+
+  indexes <- t(indexes + diag(diagValue))
+
+  new.cur.data <- tcrossprod(cur.data, indexes + diag(diagValue))
+  colnames(new.cur.data) <- colnames(cur.data)
+  malignScore <- colSums((new.cur.data - 1)^2) / nrow(new.cur.data)
+  names(malignScore) <- colnames(new.cur.data)
+  malignScore
+}
 
 .filter_gene_cnv <- function(expr, cut.off = 0.1, min.cell = 3) {
   gene.mean <- Matrix::rowMeans(expr)
