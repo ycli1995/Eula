@@ -299,9 +299,13 @@ runCNV <- function(
     chr.data = chr.data,
     window.size = window.size
   )
-  expr <- .center_expr_cnv(expr, center.method = center.method)
+  expr <- .center_across_chr_cnv(expr, center.method = center.method)
   expr <- .subtract_ref_expr_cnv(expr, ref.cells = ref.cells, inv.log = TRUE)
-  expr <- .denoise_expr_cnv(expr, sd.amplifier = sd.amplifier)
+  expr <- .denoise_by_ref_mean_sd(
+    expr,
+    ref.cells = ref.cells, 
+    sd.amplifier = sd.amplifier
+  )
   expr <- .remove_outliers_cnv(expr)
   expr
 }
