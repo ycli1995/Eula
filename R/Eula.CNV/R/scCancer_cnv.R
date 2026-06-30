@@ -485,7 +485,9 @@ getMalignScore <- function(
 #' @importFrom MatrixGenerics colSds
 .denoise_by_ref_mean_sd <- function(expr, ref.cells, sd.amplifier = 1.5) {
   mean.ref.vals <- mean(expr[, ref.cells])
-  mean.ref.sd <- mean(MatrixGenerics::colSds(expr[, ref.cells, na.rm = TRUE]))
+  mean.ref.sd <- mean(
+    MatrixGenerics::colSds(expr[, ref.cells, drop = FALSE], na.rm = TRUE)
+  )
   mean.ref.sd <- mean.ref.sd * sd.amplifier
 
   up.bound <- mean.ref.vals + mean.ref.sd
