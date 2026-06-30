@@ -30,7 +30,7 @@ predictMalignantCells <- function(
   cell.annotation <- data.frame(
     Malign.score = predict.label,
     Malign.type = "Non-malignant",
-    rownames = rownames(expr)
+    row.names = rownames(expr)
   )
   cell.annotation$Malign.type[predict.label > thres] <- "Malignant"
   cell.annotation$Malign.type <- factor(cell.annotation$Malign.type)
