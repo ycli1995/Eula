@@ -299,7 +299,7 @@ runCNV <- function(
     chr.data = chr.data,
     window.size = window.size
   )
-  expr <- .center_across_chr_cnv(expr, center.method = center.method)
+  expr <- .center_across_chr_cnv(expr, method = center.method)
   expr <- .subtract_ref_expr_cnv(expr, ref.cells = ref.cells, inv.log = TRUE)
   expr <- .denoise_by_ref_mean_sd(
     expr,
