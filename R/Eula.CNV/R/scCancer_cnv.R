@@ -210,7 +210,7 @@ prepareCNV <- function(
   rownames(cell.anno) <- cell.anno$cellName
 
   list(
-    expr.data = expr,
+    expr = expr,
     gene.chr = gene.chr,
     cell.anno = cell.anno,
     ref.cells = ref.cells
@@ -444,9 +444,9 @@ getMalignScore <- function(
     for (i in seq_len(ncol(cur.data))) {
       cur.data[, i] <- .smooth_one_cnv(cur.data[, i], window.size = window.size)
     }
-    expr.data[cur.genes.ix, ] <- cur.data
+    expr[cur.genes.ix, ] <- cur.data
   }
-  expr.data
+  expr
 }
 
 #' @importFrom MatrixGenerics colMeans colMedians
@@ -487,7 +487,7 @@ getMalignScore <- function(
   up.bound <- mean.ref.vals + mean.ref.sd
   low.bound <- mean.ref.vals - mean.ref.sd
 
-  expr[expr > low.bound & expr.data < up.bound] <- mean.ref.vals
+  expr[expr > low.bound & expr < up.bound] <- mean.ref.vals
   expr
 }
 
