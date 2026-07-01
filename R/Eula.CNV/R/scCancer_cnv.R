@@ -100,6 +100,7 @@ runMalignancy <- function(
   results
 }
 
+#' @importFrom stats density
 .get_bimodal_thres <- function(scores) {
   x.density <- density(scores)
   d.x.density <- diff(x.density$y)
@@ -143,6 +144,7 @@ runMalignancy <- function(
 }
 
 #' @importFrom dplyr %>% arrange
+#' @importFrom utils packageName
 prepareCNV <- function(
   expr,
   celltypes,
@@ -217,6 +219,7 @@ prepareCNV <- function(
   )
 }
 
+#' @importFrom utils packageName
 .get_chr_data <- function(
   expr,
   species = c("human", "mouse"),
@@ -259,6 +262,7 @@ prepareCNV <- function(
   gene.chr
 }
 
+#' @importFrom utils packageName
 .get_adj_mat <- function(species = c("human", "mouse")) {
   species <- match.arg(species)
   if (species == "human") {
@@ -312,6 +316,7 @@ runCNV <- function(
 
 #' @importFrom collapse fquantile
 #' @importFrom Matrix nnzero
+#' @importFrom methods as
 #' @export
 getMalignScore <- function(
   expr,
