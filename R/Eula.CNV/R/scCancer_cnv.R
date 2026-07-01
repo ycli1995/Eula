@@ -104,22 +104,19 @@ runMalignancy <- function(
 .get_bimodal_thres <- function(scores) {
   x.density <- density(scores)
   d.x.density <- diff(x.density$y)
-  d.sign <- as.numeric(d.x.density > 0)
+  d.sign <- (d.x.density > 0) + 0
 
   ext.pos <- which(d.sign[-1] - d.sign[-length(d.sign)] != 0)
   ext.density <- x.density$y[ext.pos]
   y.max <- max(ext.density)
-
   if (length(ext.pos) >= 3) {
-    diff.ext.density <- abs(diff(ext.density))
-    all.ei <- seq_along(diff.ext.density)
-    all.ei2 <- all.ei + 1L
-    del.ix <- cbind(
-      all.ei[diff.ext.density > y.max * 0.001],
-      all.ei2[diff.ext.density > y.max * 0.001]
-    )
-    del.ix <- as.vector(del.ix)
-    sel.ix <- which(!(seq_along(ext.density) %in% unique(del.ix)))
+    del.ix <- c()
+    for (ei in seq_along(ext.density)[-1]) {
+      if (abs(ext.density[ei] - ext.density[ei - 1]) < y.max * 0.001) {
+        del.ix <- c(del.ix, ei - 1, ei)
+      }
+    }
+    sel.ix <- !(seq_along(ext.density) %in% unique(del.ix))
     ext.density <- ext.density[sel.ix]
     ext.pos <- ext.pos[sel.ix]
   }
@@ -128,18 +125,20 @@ runMalignancy <- function(
   }
 
   t.ext.density <- c(0, ext.density, 0)
-  ext.height <- cbind(
-    abs(diff(t.ext.density)[-1]),
-    abs(diff(t.ext.density)[-length(t.ext.density)])
-  )
-  ext.height <- MatrixGenerics::colMins(ext.height)
+  ext.height <- numeric(length(ext.pos))
+  for (i in seq_along(ext.height)) {
+    ext.height[i] <- min(
+      abs(t.ext.density[i + 1] - t.ext.density[i]),
+      abs(t.ext.density[i + 1] - t.ext.density[i + 2])
+    )
+  }
   ext <- data.frame(x = ext.pos, y = ext.density, height = ext.height)
   max.ix <- order(ext.density, decreasing = TRUE)
-  if (ext.height[max.ix[2]] / ext.height[max.ix[1]] <= 0.01) {
-    return(NULL)
+  threshold <- NULL
+  if (ext.height[max.ix[2]] / ext.height[max.ix[1]] > 0.01) {
+    cut.df <- ext[c(max.ix[2]:max.ix[1]), ]
+    threshold <- x.density$x[cut.df[which.min(cut.df$y), ]$x]
   }
-  cut.df <- ext[max.ix[2]:max.ix[1], , drop = FALSE]
-  threshold <- x.density$x[cut.df[which.min(cut.df$y), "x"]]
   threshold
 }
 
@@ -307,7 +306,7 @@ runCNV <- function(
   expr <- .subtract_ref_expr_cnv(expr, ref.cells = ref.cells, inv.log = TRUE)
   expr <- .denoise_by_ref_mean_sd(
     expr,
-    ref.cells = ref.cells, 
+    ref.cells = ref.cells,
     sd.amplifier = sd.amplifier
   )
   expr <- .remove_outliers_cnv(expr)
