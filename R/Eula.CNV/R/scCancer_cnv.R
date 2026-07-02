@@ -70,14 +70,14 @@ runMalignancy <- function(
   ## malignancy type
   verboseMsg("Assign malignancy type")
   if (!is.null(all.thres)) {
-    malign.type <- rep("malignant", length(obserScore.smooth))
+    malign.type <- rep("Malignant", length(obserScore.smooth))
     if (!is.null(malign.thres)) {
-      malign.type[obserScore.smooth < malign.thres] <- "nonMalignant"
+      malign.type[obserScore.smooth < malign.thres] <- "Non-malignant"
     }
   } else {
-    malign.type <- rep("nonMalignant", length(obserScore.smooth))
+    malign.type <- rep("Non-malignant", length(obserScore.smooth))
     if (!is.null(malign.thres)) {
-      malign.type[obserScore.smooth >= malign.thres] <- "malignant"
+      malign.type[obserScore.smooth >= malign.thres] <- "Malignant"
     }
   }
   names(malign.type) <- names(obserScore.smooth)
@@ -87,7 +87,7 @@ runMalignancy <- function(
   obs.anno$Malign.score <- obserScore.smooth[rownames(obs.anno)]
   obs.anno$Malign.type <- malign.type[rownames(obs.anno)]
   ref.anno$Malign.score <- referScore.smooth[rownames(ref.anno)]
-  ref.anno$Malign.type <- "nonMalignant"
+  ref.anno$Malign.type <- "Non-malignant"
 
   results <- list(
     cnv.expr = cnv.expr,
