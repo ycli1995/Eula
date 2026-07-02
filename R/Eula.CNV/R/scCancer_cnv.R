@@ -17,6 +17,13 @@ runMalignancy <- function(
   genome = "hg38",
   verbose = TRUE
 ) {
+  if (is.null(ref.data)) {
+    if (is.null(adj.mat)) {
+      stop("`adj.mat` must be provided if `ref.data` is NULL")
+    }
+    verboseMsg("Get reference adjacency matrix")
+    ref.adj.mat <- .get_adj_mat(species)
+  }
   verboseMsg("Running `prepareCNV`")
   cnv.list <- prepareCNV(
     expr = expr,
@@ -40,10 +47,6 @@ runMalignancy <- function(
     sd.amplifier = sd.amplifier
   )
 
-  if (is.null(ref.data)) {
-    verboseMsg("Get reference adjacency matrix")
-    ref.adj.mat <- .get_adj_mat(species)
-  }
   verboseMsg("Running `getMalignScore` for reference cells")
   referScore.smooth <- getMalignScore(
     expr = cnv.expr,
