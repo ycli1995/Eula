@@ -70,6 +70,9 @@ runMalignancy <- function(
   all.thres <- .get_bimodal_thres(c(referScore.smooth, obserScore.smooth))
   malign.thres <- .get_bimodal_thres(obserScore.smooth)
 
+  verboseMsg("- all.thres: ", all.thres)
+  verboseMsg("- malign.thres: ", malign.thres)
+
   ## malignancy type
   verboseMsg("Assign malignancy type")
   if (!is.null(all.thres)) {
@@ -153,7 +156,8 @@ prepareCNV <- function(
   gene.chr = NULL,
   ref.data = NULL,
   species = "human",
-  genome = "hg38"
+  genome = "hg38",
+  verbose = TRUE
 ) {
   ## gene.chr
   if (is.null(gene.chr)) {
@@ -205,6 +209,7 @@ prepareCNV <- function(
   if (length(com.genes) == 0) {
     stop("No common genes between expr and ref.data.\n")
   }
+  verboseMsg("- Keep common genes: ", length(com.genes))
   ref.data <- ref.data[com.genes, , drop = FALSE]
   expr <- expr[com.genes, , drop = FALSE]
   expr <- cbind(expr, ref.data)
@@ -372,6 +377,7 @@ getMalignScore <- function(
   gene.sum <- Matrix::rowSums(expr > 0)
   genes.sel <- rownames(expr)[gene.mean >= cut.off & gene.sum >= min.cell]
 
+  verboseMsg("- filter_genes: Keep ", length(genes.sel), " genes.")
   expr <- expr[genes.sel, , drop = FALSE]
   expr
 }
