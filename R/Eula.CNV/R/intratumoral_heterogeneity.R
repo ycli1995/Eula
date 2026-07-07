@@ -1,4 +1,4 @@
-#' @export 
+#' @export
 ITHScore <- function(cell.embeddings, ...) {
   keep <- .filter_cells_for_ith(cell.embeddings)
   cell.embeddings <- cell.embeddings[keep, , drop = FALSE]
@@ -29,4 +29,29 @@ ITHScore <- function(cell.embeddings, ...) {
 
   keep[is.na(x)] <- FALSE
   keep
+}
+
+#' @export
+runStemness <- function(X, stem.sig = NULL, species = c("human", "mouse")) {
+  if (is.null(stem.sig)) {
+    species <- match.arg(species)
+    stem.sig.file <- system.file(
+      "txt", paste0("pcbc-stemsig-", species, ".tsv"),
+      package = packageName()
+    )
+    stem.sig <- read.delim(stem.sig.file, header = FALSE, row.names = 1)
+  }
+
+  common.genes <- intersect(rownames(stem.sig), rownames(X))
+  X <- X[common.genes, , drop = FALSE]
+  stem.sig <- stem.sig[common.genes, , drop = FALSE]
+
+  s <- apply(X, 2, function(z) {
+    cor(z, stem.sig, method = "sp", use = "complete.obs")
+  })
+  names(s) <- colnames(X)
+
+  s <- s - min(s)
+  s <- s / max(s)
+  s
 }
