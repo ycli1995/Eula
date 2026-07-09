@@ -55,3 +55,23 @@ runStemness <- function(X, stem.sig = NULL, species = c("human", "mouse")) {
   s <- s / max(s)
   s
 }
+
+#' @export
+getGenesets <- function(
+  geneset = c("hallmark-pathways", "CancerSEA"),
+  species = c("human", "mouse")
+) {
+  species <- match.arg(species)
+  geneset <- match.arg(geneset)
+  file.name <- paste0(geneset, "-", species, ".txt")
+  file.name <- system.file("txt", file.name, package = packageName())
+  genesets <- read.table(
+    file.name,
+    sep = "\t",
+    header = FALSE,
+    stringsAsFactors = FALSE
+  )
+  genesets <- split(genesets[[2]], f = genesets[[1]])
+  genesets <- lapply(genesets, function(x) unique(unlist(strsplit(x, ", "))))
+  genesets
+}
