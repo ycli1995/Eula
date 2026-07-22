@@ -24,7 +24,7 @@ asMatrix <- function(object, ...) {
 #' @rdname asMatrix
 #' @export
 #' @method asMatrix default
-asMatrix.default <- function(object, chunk.size = 1000, verbose = TRUE) {
+asMatrix.default <- function(object, chunk.size = 1000, verbose = TRUE, ...) {
   breaks <- 0:ceiling(nrow(object) / chunk.size) * chunk.size
   k <- cut(seq_len(nrow(object)), breaks = breaks)
   mat <- matrix(0, nrow(object), ncol(object), dimnames = dimnames(object))

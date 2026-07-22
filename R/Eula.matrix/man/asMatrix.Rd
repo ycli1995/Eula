@@ -9,7 +9,7 @@
 \usage{
 asMatrix(object, ...)
 
-\method{asMatrix}{default}(object, chunk.size = 1000, verbose = TRUE)
+\method{asMatrix}{default}(object, chunk.size = 1000, verbose = TRUE, ...)
 
 \method{asMatrix}{matrix}(object, ...)
 

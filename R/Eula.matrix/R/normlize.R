@@ -3,7 +3,8 @@
 #'
 #' Normalize each cell by relative counts, then natural log-transform the data.
 #'
-#' @param mat Matrix with the raw data.
+#' @param object Matrix with the raw data.
+#' @param ... `r .dot_param`
 #'
 #' @export logNorm
 logNorm <- function(object, ...) {
