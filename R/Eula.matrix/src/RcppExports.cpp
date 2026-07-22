@@ -99,12 +99,12 @@ BEGIN_RCPP
 END_RCPP
 }
 // matrix_log_norm
-Eigen::MatrixXd matrix_log_norm(Eigen::MatrixXd data, double scale_factor);
+Eigen::MatrixXd matrix_log_norm(Eigen::MatrixXd data, const std::vector<double>& scale_factor);
 RcppExport SEXP _Eula_matrix_matrix_log_norm(SEXP dataSEXP, SEXP scale_factorSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< Eigen::MatrixXd >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< double >::type scale_factor(scale_factorSEXP);
+    Rcpp::traits::input_parameter< const std::vector<double>& >::type scale_factor(scale_factorSEXP);
     rcpp_result_gen = Rcpp::wrap(matrix_log_norm(data, scale_factor));
     return rcpp_result_gen;
 END_RCPP

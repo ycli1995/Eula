@@ -155,11 +155,12 @@ Eigen::SparseMatrix<double> dgcmatrix_clr_norm(
 }
 
 // [[Rcpp::export(rng = false)]]
-Eigen::MatrixXd matrix_log_norm(Eigen::MatrixXd data, double scale_factor) {
+Eigen::MatrixXd
+matrix_log_norm(Eigen::MatrixXd data, const std::vector<double>& scale_factor) {
     for (int i = 0; i < data.cols(); ++i) {
         double sum = data.col(i).sum();
         for (int j = 0; j < data.rows(); ++j) {
-            data(j, i) = std::log1p(data(j, i) / sum * scale_factor);
+            data(j, i) = std::log1p(data(j, i) / sum * scale_factor[i]);
         }
     }
     return data;

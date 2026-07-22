@@ -29,3 +29,6 @@ std::vector<double> dgcmatrix_std_rowvar(
 
 Eigen::MatrixXd
 matrix_rc_norm(Eigen::MatrixXd data, const std::vector<double>& scale_factor);
+
+Eigen::MatrixXd
+matrix_log_norm(Eigen::MatrixXd data, const std::vector<double>& scale_factor);
