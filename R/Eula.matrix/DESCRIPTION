@@ -19,6 +19,7 @@ Imports:
     Rcpp
 Suggests: 
     Seurat (>= 5.1.0),
+    SeuratObject,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Depends: 

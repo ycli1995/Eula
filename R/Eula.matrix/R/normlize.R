@@ -37,13 +37,24 @@ logNorm.dgCMatrix <- function(object, scale.factor = 10000, ...) {
   object
 }
 
+#' Normalize data using relative counts
+#'
+#' Normalize each cell by total counts over all genes, so that every cell has
+#' the same total count after normalization.
+#'
+#' @param object Matrix with the raw data.
+#' @param ... `r .dot_param`
+#'
 #' @export relativeCounts
 relativeCounts <- function(object, ...) {
   UseMethod("relativeCounts", object)
 }
 
-#' @export
+#' @param scale.factor The total count after normalization. Default is 10000.
+#' 
 #' @method relativeCounts matrix
+#' @export
+#' @rdname relativeCounts
 relativeCounts.matrix <- function(object, scale.factor = 10000, ...) {
   scale.factor <- .rep_scale_factor(scale.factor, ncol(object))
   old.dimnames <- dimnames(object)
@@ -54,8 +65,10 @@ relativeCounts.matrix <- function(object, scale.factor = 10000, ...) {
 
 #' @importFrom Matrix colSums
 #' @importClassesFrom Matrix dgCMatrix
-#' @export
+#' 
 #' @method relativeCounts dgCMatrix
+#' @export
+#' @rdname relativeCounts
 relativeCounts.dgCMatrix <- function(object, scale.factor = 10000, ...) {
   scale.factor <- .rep_scale_factor(scale.factor, ncol(object))
   object@x <- object@x /

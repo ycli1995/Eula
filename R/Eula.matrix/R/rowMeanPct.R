@@ -54,7 +54,6 @@ rowMeanPct.CsparseMatrix <- function(
   if (is.character(cell.groups)) {
     cell.groups <- as.factor(cell.groups)
   }
-  cell.groups <- as.factor(cell.groups)
   if (is.factor(cell.groups)) {
     if (!length(cell.groups) == ncol(object)) {
       stop(
