@@ -28,11 +28,7 @@ seurat_find_markers <- function(
   )
 }
 
-test_that("differWilcox works", {
-  skip_if_not_installed("Seurat")
-  skip_if_not_installed("SeuratObject")
-
-  obj <- SeuratObject::pbmc_small
+test_de_helper <- function(obj, test.use, ...) {
   ans <- seurat_find_markers(
     obj,
     ident.1 = "0",
@@ -44,8 +40,25 @@ test_that("differWilcox works", {
   cells.1 <- colnames(m)[SeuratObject::Idents(obj) == "0"]
   cells.2 <- colnames(m)[SeuratObject::Idents(obj) == "1"]
 
-  out <- differWilcox(m, cells.1, cells.2)[rownames(ans), , drop = FALSE]
+  out <- suppressMessages(
+    testDE(
+      object = m,
+      cells.1 = cells.1,
+      cells.2 = cells.2,
+      test.use = "wilcox"
+    )
+  )
+  out <- out[rownames(ans), , drop = FALSE]
   expect_equal(out$p_val, ans$p_val)
+  expect_equal(out$p_val_adj, ans$p_val_adj)
+}
+
+test_that("differWilcox works", {
+  skip_if_not_installed("Seurat")
+  skip_if_not_installed("SeuratObject")
+
+  obj <- SeuratObject::pbmc_small
+  test_de_helper(obj, "wilcox")
 })
 
 test_that("differWilcox - limma works", {
@@ -53,20 +66,7 @@ test_that("differWilcox - limma works", {
   skip_if_not_installed("SeuratObject")
 
   obj <- SeuratObject::pbmc_small
-  ans <- seurat_find_markers(
-    obj,
-    ident.1 = "0",
-    ident.2 = "1",
-    test.use = "wilcox_limma"
-  )
-
-  m <- SeuratObject::GetAssayData(obj)
-  cells.1 <- colnames(m)[SeuratObject::Idents(obj) == "0"]
-  cells.2 <- colnames(m)[SeuratObject::Idents(obj) == "1"]
-
-  out <- differWilcox(m, cells.1, cells.2, limma = TRUE)
-  out <- out[rownames(ans), , drop = FALSE]
-  expect_equal(out$p_val, ans$p_val)
+  test_de_helper(obj, "wilcox_limma")
 })
 
 test_that("differTTest works", {
@@ -74,23 +74,10 @@ test_that("differTTest works", {
   skip_if_not_installed("SeuratObject")
 
   obj <- SeuratObject::pbmc_small
-  ans <- seurat_find_markers(
-    obj,
-    ident.1 = "0",
-    ident.2 = "1",
-    test.use = "t"
-  )
-
-  m <- SeuratObject::GetAssayData(obj)
-  cells.1 <- colnames(m)[SeuratObject::Idents(obj) == "0"]
-  cells.2 <- colnames(m)[SeuratObject::Idents(obj) == "1"]
-
-  out <- differTTest(m, cells.1, cells.2)[rownames(ans), , drop = FALSE]
-  expect_equal(out$p_val, ans$p_val)
+  test_de_helper(obj, "t")
 })
 
 test_that("differROC works", {
-  skip_if_not_installed("Seurat")
   skip_if_not_installed("SeuratObject")
   skip_if_not_installed("ROCR")
 
@@ -117,22 +104,7 @@ test_that("differMAST works", {
   skip_if_not_installed("MAST")
 
   obj <- SeuratObject::pbmc_small
-  ans <- suppressMessages(
-    seurat_find_markers(
-      obj,
-      ident.1 = "0",
-      ident.2 = "1",
-      test.use = "MAST"
-    )
-  )
-
-  m <- SeuratObject::GetAssayData(obj)[rownames(ans), , drop = FALSE]
-  cells.1 <- colnames(m)[SeuratObject::Idents(obj) == "0"]
-  cells.2 <- colnames(m)[SeuratObject::Idents(obj) == "1"]
-  out <- suppressMessages(
-    differMAST(m, cells.1, cells.2)[rownames(ans), , drop = FALSE]
-  )
-  expect_equal(out$p_val, ans$p_val)
+  test_de_helper(obj, "MAST")
 })
 
 test_that("differDESeq2 works", {
@@ -145,26 +117,10 @@ test_that("differDESeq2 works", {
     obj[[SeuratObject::DefaultAssay(obj)]],
     "counts"
   )
-  m <- as.matrix(m) + 1
   obj[[SeuratObject::DefaultAssay(obj)]] <- SeuratObject::SetAssayData(
     obj[[SeuratObject::DefaultAssay(obj)]],
     "counts",
-    m
+    as.matrix(m) + 1
   )
-
-  ans <- suppressMessages(
-    seurat_find_markers(
-      obj,
-      ident.1 = "0",
-      ident.2 = "1",
-      test.use = "DESeq2"
-    )
-  )
-
-  cells.1 <- colnames(m)[SeuratObject::Idents(obj) == "0"]
-  cells.2 <- colnames(m)[SeuratObject::Idents(obj) == "1"]
-  out <- suppressMessages(
-    differDESeq2(m, cells.1, cells.2)[rownames(ans), , drop = FALSE]
-  )
-  expect_equal(out$p_val, ans$p_val)
+  test_de_helper(obj, "DESeq2")
 })
