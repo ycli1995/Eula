@@ -3,8 +3,7 @@ test_that("foldChange works", {
   skip_if_not_installed("Seurat")
   skip_if_not_installed("SeuratObject")
 
-  data("pbmc_small", package = "SeuratObject")
-  obj <- pbmc_small
+  obj <- SeuratObject::pbmc_small
   ans <- Seurat::FoldChange(obj, ident.1 = "0", ident.2 = "1")
 
   m <- SeuratObject::GetAssayData(obj)

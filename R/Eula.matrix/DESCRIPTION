@@ -18,6 +18,9 @@ Imports:
     MatrixGenerics,
     Rcpp
 Suggests: 
+    edgeR,
+    MAST,
+    ROCR,
     Seurat (>= 5.1.0),
     SeuratObject,
     testthat (>= 3.0.0)
