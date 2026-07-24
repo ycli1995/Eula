@@ -136,7 +136,8 @@ testDE.CsparseMatrix <- function(
   if (!test.use %in% DE.METHODS$nocorrect) {
     de.results0$p_val_adj <- p.adjust(
       p = de.results0$p_val,
-      method = p.adjust.method
+      method = p.adjust.method,
+      n = nrow(object)
     )
     if (use.adjust) {
       p.col <- "p_val_adj"

@@ -28,15 +28,17 @@ seurat_find_markers <- function(
   )
 }
 
-test_de_helper <- function(obj, test.use, ...) {
-  ans <- seurat_find_markers(
-    obj,
-    ident.1 = "0",
-    ident.2 = "1",
-    test.use = "wilcox"
+test_de_helper <- function(obj, test.use, slot = "data", ...) {
+  ans <- suppressMessages(
+    seurat_find_markers(
+      obj,
+      ident.1 = "0",
+      ident.2 = "1",
+      test.use = test.use
+    )
   )
 
-  m <- SeuratObject::GetAssayData(obj)
+  m <- SeuratObject::GetAssayData(obj[[Seurat::DefaultAssay(obj)]], slot)
   cells.1 <- colnames(m)[SeuratObject::Idents(obj) == "0"]
   cells.2 <- colnames(m)[SeuratObject::Idents(obj) == "1"]
 
@@ -45,7 +47,7 @@ test_de_helper <- function(obj, test.use, ...) {
       object = m,
       cells.1 = cells.1,
       cells.2 = cells.2,
-      test.use = "wilcox"
+      test.use = test.use
     )
   )
   out <- out[rownames(ans), , drop = FALSE]
@@ -122,5 +124,5 @@ test_that("differDESeq2 works", {
     "counts",
     as.matrix(m) + 1
   )
-  test_de_helper(obj, "DESeq2")
+  test_de_helper(obj, "DESeq2", slot = "counts")
 })
