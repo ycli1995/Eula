@@ -317,21 +317,20 @@ differMAST.matrix <- function(
   if (!requireNamespace("MAST", quietly = TRUE)) {
     stop("Please install MAST - learn more at https://github.com/RGLab/MAST")
   }
-  object <- object[, c(cells.1, cells.2), drop = FALSE]
-  group.info <- data.frame(row.names = c(cells.1, cells.2))
-  latent.vars <- latent.vars %||% group.info
-  group.info[cells.1, "condition"] <- "Group1"
-  group.info[cells.2, "condition"] <- "Group2"
-  group.info[, "condition"] <- factor(group.info[, "condition"])
-
+  object <- .check_subset_cells(mat = object, cells = c(cells.1, cells.2))
+  latent.vars <- latent.vars %||% data.frame(row.names = colnames(object))
+  group.info <- .deseq2_group_info(
+    mat = object,
+    cells.1 = cells.1,
+    cells.2 = cells.2
+  )
+  colnames(group.info) <- c("condition")
   latent.vars.names <- c("condition", colnames(latent.vars))
   latent.vars <- cbind(latent.vars, group.info)
-  latent.vars$wellKey <- rownames(latent.vars)
   fdat <- data.frame(primerid = rownames(object))
   rownames(fdat) <- fdat[, 1]
-
   sca <- MAST::FromMatrix(
-    exprsArray = object,
+    exprsArray = as.matrix(object),
     check_sanity = FALSE,
     cData = latent.vars,
     fData = fdat
@@ -345,7 +344,8 @@ differMAST.matrix <- function(
   summaryDt <- MAST::summary(zlmCond, doLRT = "conditionGroup2")$datatable
   summaryDt <- as.data.frame(summaryDt)
   summaryDt <- summaryDt[summaryDt[, "component"] == "H", , drop = FALSE]
-  data.frame(p_val = summaryDt[, 4], row.names = summaryDt[, 1])
+  res <- data.frame(p_val = summaryDt[, 4], row.names = summaryDt[, 1])
+  res
 }
 
 #' @export
@@ -357,8 +357,8 @@ differMAST.CsparseMatrix <- function(
   latent.vars = NULL,
   ...
 ) {
-  differMAST(
-    object = as.matrix(object[, c(cells.1, cells.2), drop = FALSE]),
+  differMAST.matrix(
+    object = object,
     cells.1 = cells.1,
     cells.2 = cells.2,
     latent.vars = latent.vars,
@@ -423,14 +423,66 @@ differDESeq2.matrix <- function(object, cells.1, cells.2, ...) {
       "https://bioconductor.org/packages/release/bioc/html/DESeq2.html"
     )
   }
-  object <- object[, c(cells.1, cells.2), drop = FALSE]
+  res0 <- data.frame(row.names = rownames(object))
+  res0$p_val <- 1
+  countData <- .check_subset_cells(object, cells = c(cells.1, cells.2))
+  group.info <- .deseq2_group_info(
+    mat = countData, 
+    cells.1 = cells.1, 
+    cells.2 = cells.2
+  )
+  features <- rownames(object)[Matrix::rowSums(object > 0) == ncol(object)]
+  countData <- .check_subset_features(countData, features = features)
+  res <- .deseq2_matrix(
+    countData = as.matrix(countData),
+    group.info = group.info,
+    ...
+  )
+  res0[rownames(res), "p_val"] <- res$p_val
+  res0
+}
+
+#' @export
+#' @method differDESeq2 CsparseMatrix
+differDESeq2.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
+  differDESeq2.matrix(
+    object = object,
+    cells.1 = cells.1,
+    cells.2 = cells.2,
+    ...
+  )
+}
+
+.check_subset_cells <- function(mat, cells) {
+  if (setequal(colnames(mat), cells)) {
+    return(mat)
+  }
+  mat <- mat[, cells, drop = FALSE]
+  mat
+}
+
+.check_subset_features <- function(mat, features) {
+  if (setequal(colnames(mat), features)) {
+    return(mat)
+  }
+  mat <- mat[features, , drop = FALSE]
+  mat
+}
+
+.deseq2_group_info <- function(mat, cells.1, cells.2) {
   group.info <- data.frame(row.names = c(cells.1, cells.2))
   group.info[cells.1, "group"] <- "Group1"
   group.info[cells.2, "group"] <- "Group2"
   group.info[, "group"] <- factor(group.info[, "group"])
   group.info$wellKey <- rownames(group.info)
+  group.info <- group.info[colnames(mat), , drop = FALSE]
+  group.info
+}
+
+.deseq2_matrix <- function(countData, group.info, ...) {
+  countData <- as.matrix(countData)
   dds1 <- DESeq2::DESeqDataSetFromMatrix(
-    countData = object,
+    countData = countData,
     colData = group.info,
     design = ~group
   )
@@ -445,17 +497,6 @@ differDESeq2.matrix <- function(object, cells.1, cells.2, ...) {
   )
   res <- data.frame(p_val = res$pvalue, row.names = rownames(res))
   res
-}
-
-#' @export
-#' @method differDESeq2 CsparseMatrix
-differDESeq2.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
-  differDESeq2.matrix(
-    object = as.matrix(object[, c(cells.1, cells.2), drop = FALSE]),
-    cells.1 = cells.1,
-    cells.2 = cells.2,
-    ...
-  )
 }
 
 .get_lapply <- function() {
