@@ -12,6 +12,7 @@ testDE <- function(object, ...) {
   UseMethod("testDE", object)
 }
 
+#' @importFrom stats p.adjust
 #' @export
 #' @method testDE CsparseMatrix
 testDE.CsparseMatrix <- function(
@@ -278,8 +279,9 @@ differTTest <- function(object, ...) {
 }
 
 #' @importFrom stats t.test
+#' 
 #' @export
-#' @method differWilcox CsparseMatrix
+#' @method differTTest CsparseMatrix
 differTTest.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
   my.sapply <- .get_sapply()
   p_val <- my.sapply(
@@ -291,7 +293,7 @@ differTTest.CsparseMatrix <- function(object, cells.1, cells.2, ...) {
 }
 
 #' @export
-#' @method differWilcox matrix
+#' @method differTTest matrix
 differTTest.matrix <- function(object, cells.1, cells.2, ...) {
   differTTest.CsparseMatrix(
     object = object,
@@ -306,6 +308,8 @@ differMAST <- function(object, ...) {
   UseMethod("differMAST", object)
 }
 
+#' @importFrom stats as.formula relevel
+#' 
 #' @export
 #' @method differMAST matrix
 differMAST.matrix <- function(
